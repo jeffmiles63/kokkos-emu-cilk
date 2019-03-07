@@ -2953,7 +2953,7 @@ public:
       // Assume destruction is only required when construction is requested.
       // The ViewValueFunctor has both value construction and destruction operators.
       record->m_destroy = functor_type( ( (Kokkos::Impl::ViewCtorProp<void,execution_space> const &) arg_prop).value
-                                      , (value_type *) m_impl_handle
+                                      , (value_type *) &m_impl_handle[0]
                                       , m_impl_offset.span()
                                       );
 

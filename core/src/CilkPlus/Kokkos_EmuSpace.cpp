@@ -420,9 +420,11 @@ SharedAllocationRecord( RecordBase*                      basePtr
                         , int node
                         , const RecordBase::function_type  arg_dealloc
                         )
-  : SharedAllocationRecord< void , void >
-      ( basePtr
-      , reinterpret_cast<SharedAllocationHeader*>( arg_space->allocate( sizeof(SharedAllocationHeader) + arg_alloc_size ) )
+  : SharedAllocationRecord< void , void > ( 
+#ifdef KOKKOS_DEBUG
+        basePtr, 
+#endif
+        reinterpret_cast<SharedAllocationHeader*>( arg_space->allocate( sizeof(SharedAllocationHeader) + arg_alloc_size ) )
       , sizeof(SharedAllocationHeader) + arg_alloc_size
       , arg_dealloc
       )
@@ -458,9 +460,11 @@ SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , void >::
                         )
   // Pass through allocated [ SharedAllocationHeader , user_memory ]
   // Pass through deallocation function
-  : SharedAllocationRecord< void , void >
-      ( basePtr
-      , reinterpret_cast<SharedAllocationHeader*>( arg_space->allocate( sizeof(SharedAllocationHeader) + arg_alloc_size ) )
+  : SharedAllocationRecord< void , void > ( 
+#ifdef KOKKOS_DEBUG
+        basePtr, 
+#endif
+        reinterpret_cast<SharedAllocationHeader*>( arg_space->allocate( sizeof(SharedAllocationHeader) + arg_alloc_size ) )
       , sizeof(SharedAllocationHeader) + arg_alloc_size
       , nullptr
       )
@@ -502,8 +506,9 @@ custom_increment( Kokkos::Impl::SharedAllocationRecord<void,void>* pRec ) {
 
 Kokkos::Impl::SharedAllocationRecord<void,void>*
 SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , void >::custom_decrement( Kokkos::Impl::SharedAllocationRecord<void,void>* pRec ) {
-
-   constexpr static SharedAllocationRecord<void,void> * zero = 0 ;
+#ifdef KOKKOS_DEBUG
+   constexpr static SharedAllocationRecord<void,void> * zero = nullptr ;
+#endif
    bool bFreeMemory = false;
    long * lRef = (long*)Kokkos::Experimental::getRefPtr();
    for ( int i = 0; i < NODELETS(); i++) {
@@ -514,6 +519,7 @@ SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , void >::custo
       if ( old_count == 1 ) {
         bFreeMemory = true;
 
+#ifdef KOKKOS_DEBUG
         // before:  arg_record->m_prev->m_next == arg_record  &&
         //          arg_record->m_next->m_prev == arg_record
         //
@@ -545,6 +551,7 @@ SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , void >::custo
 
         pL->m_next = 0 ;
         pL->m_prev = 0 ;
+#endif
         printf("cleared linked list on %d, now calling dealloc\n", i);
         fflush(stdout);
 
@@ -576,9 +583,11 @@ SharedAllocationRecord( RecordBase*                  basePtr
                       )
   // Pass through allocated [ SharedAllocationHeader , user_memory ]
   // Pass through deallocation function
-  : SharedAllocationRecord< void , void >
-      ( basePtr
-      , (SharedAllocationHeader*)( arg_ptr )
+  : SharedAllocationRecord< void , void > ( 
+#ifdef KOKKOS_DEBUG
+        basePtr, 
+#endif
+        (SharedAllocationHeader*)( arg_ptr )
       , sizeof(SharedAllocationHeader) + arg_alloc_size
       , nullptr
       )
@@ -614,9 +623,11 @@ SharedAllocationRecord( RecordBase*                        basePtr
                         , int node
                         , const RecordBase::function_type  arg_dealloc
                       )
-  : SharedAllocationRecord< void , void >
-      ( basePtr
-      , reinterpret_cast<SharedAllocationHeader*>( arg_ptr )
+  : SharedAllocationRecord< void , void > ( 
+#ifdef KOKKOS_DEBUG
+        basePtr,
+#endif
+        reinterpret_cast<SharedAllocationHeader*>( arg_ptr )
       , sizeof(SharedAllocationHeader) + arg_alloc_size
       , arg_dealloc
       )
@@ -652,9 +663,11 @@ SharedAllocationRecord( const Kokkos::Experimental::EmuStridedSpace & arg_space
                       )
   // Pass through allocated [ SharedAllocationHeader , user_memory ]
   // Pass through deallocation function
-  : SharedAllocationRecord< void , void >
-      ( & SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void >::s_root_record
-      , reinterpret_cast<SharedAllocationHeader*>( arg_space.allocate( sizeof(SharedAllocationHeader) + arg_alloc_size ) )
+  : SharedAllocationRecord< void , void > ( 
+#ifdef KOKKOS_DEBUG
+      & SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void >::s_root_record, 
+#endif
+        reinterpret_cast<SharedAllocationHeader*>( arg_space.allocate( sizeof(SharedAllocationHeader) + arg_alloc_size ) )
       , sizeof(SharedAllocationHeader) + arg_alloc_size
       , arg_dealloc
       )
@@ -859,6 +872,7 @@ void
 SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , void >::
 print_records( std::ostream & s , const Kokkos::Experimental::EmuLocalSpace & , bool detail )
 {
+#ifdef KOKKOS_DEBUG
   SharedAllocationRecord< void , void > * rs = (SharedAllocationRecord< void , void > *)mw_ptr1to0(Kokkos::Experimental::EmuLocalSpace::local_root_record);
   SharedAllocationRecord< void , void > * r = rs;
 
@@ -930,6 +944,11 @@ print_records( std::ostream & s , const Kokkos::Experimental::EmuLocalSpace & , 
       r = r->m_next ;
     } while ( r != rs );
   }
+#else
+  Kokkos::Impl::throw_runtime_exception(
+      "Kokkos::Impl::SharedAllocationRecord<EmuLocalSpace,void>::print_records"
+      " only works with KOKKOS_DEBUG enabled");
+#endif
 }
 
 void

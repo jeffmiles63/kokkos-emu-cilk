@@ -141,7 +141,7 @@ namespace Experimental {
 
 bool CilkPlus::is_initialized()
 {
-  return Impl::g_serial_is_initialized ;
+  return Kokkos::Impl::g_serial_is_initialized ;
 }
 
 void CilkPlus::initialize( unsigned threads_count
@@ -154,36 +154,36 @@ void CilkPlus::initialize( unsigned threads_count
   (void) use_cores_per_numa;
   (void) allow_asynchronous_threadpool;
 
-  Impl::SharedAllocationRecord< void, void >::tracking_enable();
+  Kokkos::Impl::SharedAllocationRecord< void, void >::tracking_enable();
 
   // Init the array of locks used for arbitrarily sized atomics
-  Impl::init_lock_array_host_space();
+  Kokkos::Impl::init_lock_array_host_space();
   #if defined(KOKKOS_ENABLE_PROFILING)
     Kokkos::Profiling::initialize();
   #endif
 
-  Impl::g_serial_is_initialized = true;
+  Kokkos::Impl::g_serial_is_initialized = true;
 }
 
 void CilkPlus::finalize()
 {
-  if ( Impl::g_serial_thread_team_data.scratch_buffer() ) {
-    Impl::g_serial_thread_team_data.disband_team();
-    Impl::g_serial_thread_team_data.disband_pool();
+  if ( Kokkos::Impl::g_serial_thread_team_data.scratch_buffer() ) {
+    Kokkos::Impl::g_serial_thread_team_data.disband_team();
+    Kokkos::Impl::g_serial_thread_team_data.disband_pool();
 
     Kokkos::HostSpace space ;
 
-    space.deallocate( Impl::g_serial_thread_team_data.scratch_buffer()
-                    , Impl::g_serial_thread_team_data.scratch_bytes() );
+    space.deallocate( Kokkos::Impl::g_serial_thread_team_data.scratch_buffer()
+                    , Kokkos::Impl::g_serial_thread_team_data.scratch_bytes() );
 
-    Impl::g_serial_thread_team_data.scratch_assign( (void*) 0, 0, 0, 0, 0, 0 );
+    Kokkos::Impl::g_serial_thread_team_data.scratch_assign( (void*) 0, 0, 0, 0, 0, 0 );
   }
 
   #if defined(KOKKOS_ENABLE_PROFILING)
     Kokkos::Profiling::finalize();
   #endif
 
-  Impl::g_serial_is_initialized = false;
+  Kokkos::Impl::g_serial_is_initialized = false;
 }
 
 const char* CilkPlus::name() { return "CilkPlus"; }

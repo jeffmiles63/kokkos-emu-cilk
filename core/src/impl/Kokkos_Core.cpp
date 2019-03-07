@@ -244,8 +244,11 @@ void finalize_internal( const bool all_spaces = false )
   typename decltype(finalize_hooks)::size_type  numSuccessfulCalls = 0;
   while(! finalize_hooks.empty()) {
     auto f = finalize_hooks.top();
+#if !defined(KOKKOS_ENABLE_EMU)
     try {
+#endif
       f();
+#if !defined(KOKKOS_ENABLE_EMU)
     }
     catch(...) {
       std::cerr << "Kokkos::finalize: A finalize hook (set via "
@@ -257,6 +260,7 @@ void finalize_internal( const bool all_spaces = false )
         "were pushed." << std::endl;
       std::terminate();
     }
+#endif
     finalize_hooks.pop();
     ++numSuccessfulCalls;
   }

@@ -11,6 +11,7 @@ vpath %.cpp ${KOKKOS_PATH}/core/unit_test/openmptarget
 vpath %.cpp ${KOKKOS_PATH}/core/unit_test/qthreads
 vpath %.cpp ${KOKKOS_PATH}/core/unit_test/cuda
 vpath %.cpp ${KOKKOS_PATH}/core/unit_test/rocm
+vpath %.cpp ${KOKKOS_PATH}/core/unit_test/cilkplus
 
 
 TEST_HEADERS = $(wildcard $(KOKKOS_PATH)/core/unit_test/*.hpp)
@@ -19,8 +20,13 @@ TEST_HEADERS += $(wildcard $(KOKKOS_PATH)/core/unit_test/*/*.hpp)
 default: build_all
 	echo "End Build"
 
+ifeq (,$(findstring Emu,$(KOKKOS_DEVICES)))
+  KOKKOS_ENABLE_EMU=1
+endif
 ifneq (,$(findstring Cuda,$(KOKKOS_DEVICES)))
   CXX = $(KOKKOS_PATH)/bin/nvcc_wrapper
+else ifeq ($(KOKKOS_ENABLE_EMU), 1)
+  CXX = emu-cc
 else
   CXX = g++
 endif
@@ -28,11 +34,18 @@ endif
 CXXFLAGS = -O3
 LINK ?= $(CXX)
 LDFLAGS ?=
+ifneq ($(KOKKOS_ENABLE_EMU), 1)
 override LDFLAGS += -lpthread
+endif
 
 include $(KOKKOS_PATH)/Makefile.kokkos
 
-KOKKOS_CXXFLAGS += -I$(GTEST_PATH) -I${KOKKOS_PATH}/core/unit_test
+KOKKOS_CXXFLAGS += -I${KOKKOS_PATH}/core/unit_test
+ifeq ($(KOKKOS_ENABLE_EMU), 1)
+KOKKOS_CXXFLAGS += -I${KOKKOS_PATH}/core/unit_test/emu-test
+else
+KOKKOS_CXXFLAGS += -I$(GTEST_PATH)
+endif
 
 TEST_TARGETS =
 TARGETS =
@@ -128,6 +141,36 @@ ifeq ($(KOKKOS_INTERNAL_USE_ROCM), 1)
         TEST_TARGETS += test-rocm
 endif
 
+ifeq ($(KOKKOS_INTERNAL_USE_CILKPLUS), 1)
+   ifeq ($(KOKKOS_ENABLE_EMU), 1)
+        OBJ_CILKPLUS = UnitTestEmuMain.o emu-test.o streamimport.o
+   else
+        OBJ_CILKPLUS = UnitTestMainInit.o gtest-all.o
+   endif
+##        OBJ_CILKPLUS += TestCilkPlus_Init.o
+##        OBJ_CILKPLUS += TestCilkPlus_SharedAlloc.o
+        OBJ_CILKPLUS += TestViewMemoryTraits.o
+##        OBJ_CILKPLUS += TestCilkPlus_RangePolicy.o
+##        OBJ_CILKPLUS += TestCilkPlus_ViewAPI_b.o
+##        OBJ_CILKPLUS += TestCilkPlus_ViewMapping_a.o TestCilkPlus_ViewMapping_b.o TestCilkPlus_ViewMapping_subview.o
+##        OBJ_CILKPLUS += TestCilkPlus_ViewOfClass.o
+##        OBJ_CILKPLUS += TestCilkPlus_SubView_a.o TestCilkPlus_SubView_b.o
+##        OBJ_CILKPLUS += TestCilkPlus_SubView_c01.o TestCilkPlus_SubView_c02.o TestCilkPlus_SubView_c03.o
+##        OBJ_CILKPLUS += TestCilkPlus_SubView_c04.o TestCilkPlus_SubView_c05.o TestCilkPlus_SubView_c06.o
+##        OBJ_CILKPLUS += TestCilkPlus_SubView_c07.o TestCilkPlus_SubView_c08.o TestCilkPlus_SubView_c09.o
+##        OBJ_CILKPLUS += TestCilkPlus_SubView_c10.o TestCilkPlus_SubView_c11.o TestCilkPlus_SubView_c12.o
+##        OBJ_CILKPLUS += TestCilkPlus_Reductions.o
+##        OBJ_CILKPLUS +=TestCilkPlus_Scan.o
+##        OBJ_CILKPLUS += TestCilkPlus_Complex.o
+##        OBJ_CILKPLUS += TestCilkPlus_AtomicOperations.o TestCilkPlus_AtomicViews.o 
+##        OBJ_CILKPLUS += TestCilkPlus_Atomics.o
+##        OBJ_CILKPLUS += TestCilkPlus_Team.o TestCilkPlus_TeamScratch.o
+##        OBJ_CILKPLUS += TestCilkPlus_TeamReductionScan.o
+##        OBJ_CILKPLUS += TestCilkPlus_Other.o
+##        OBJ_CILKPLUS += TestCilkPlus_MDRange.o
+        TARGETS += KokkosCore_UnitTest_CilkPlus.mwx
+        TEST_TARGETS += test-cilkplus
+endif
 ifeq ($(KOKKOS_INTERNAL_USE_PTHREADS), 1)
 
 	OBJ_THREADS = UnitTestMainInit.o gtest-all.o
@@ -287,6 +330,7 @@ ifeq ($(KOKKOS_INTERNAL_USE_SERIAL), 1)
 	TEST_TARGETS += test-serial
 endif
 
+ifneq ($(KOKKOS_ENABLE_EMU), 1)
 OBJ_HWLOC = TestHWLOC.o UnitTestMain.o gtest-all.o
 TARGETS += KokkosCore_UnitTest_HWLOC
 TEST_TARGETS += test-hwloc
@@ -296,7 +340,9 @@ TARGETS += KokkosCore_UnitTest_HostBarrier
 TEST_TARGETS += test-host-barrier
 
 OBJ_DEFAULT = UnitTestMainInit.o gtest-all.o
+endif
 ifneq ($(KOKKOS_INTERNAL_USE_OPENMPTARGET), 1)
+ifneq ($(KOKKOS_INTERNAL_USE_CILKPLUS), 1)
 ifneq ($(KOKKOS_INTERNAL_COMPILER_HCC), 1)
   OBJ_DEFAULT += TestDefaultDeviceType.o 
   OBJ_DEFAULT += TestDefaultDeviceType_a1.o TestDefaultDeviceType_b1.o TestDefaultDeviceType_c1.o 
@@ -305,22 +351,31 @@ ifneq ($(KOKKOS_INTERNAL_COMPILER_HCC), 1)
   OBJ_DEFAULT += TestDefaultDeviceType_d.o
 endif
 endif
+endif
 
+ifneq ($(KOKKOS_ENABLE_EMU), 1)
 TARGETS += KokkosCore_UnitTest_Default
 TEST_TARGETS += test-default
+endif
 
+ifneq ($(KOKKOS_ENABLE_EMU), 1)
 TARGETS += KokkosCore_UnitTest_PushFinalizeHook
 TEST_TARGETS += test-push-finalize-hook
+endif
 
+ifneq ($(KOKKOS_ENABLE_EMU), 1)
 TARGETS += KokkosCore_UnitTest_PushFinalizeHook_terminate
 TEST_TARGETS += test-push-finalize-hook-terminate
+endif
 
+ifneq ($(KOKKOS_ENABLE_EMU), 1)
 NUM_INITTESTS = 16
 INITTESTS_NUMBERS := $(shell seq 1 ${NUM_INITTESTS})
 INITTESTS_TARGETS := $(addprefix KokkosCore_UnitTest_DefaultDeviceTypeInit_,${INITTESTS_NUMBERS})
 TARGETS += ${INITTESTS_TARGETS}
 INITTESTS_TEST_TARGETS := $(addprefix test-default-init-,${INITTESTS_NUMBERS})
 TEST_TARGETS += ${INITTESTS_TEST_TARGETS}
+endif
 
 KokkosCore_UnitTest_Cuda: $(OBJ_CUDA) $(KOKKOS_LINK_DEPENDS)
 	$(LINK) $(EXTRA_PATH) $(OBJ_CUDA) $(KOKKOS_LIBS) $(LIB) $(KOKKOS_LDFLAGS) $(LDFLAGS) -o KokkosCore_UnitTest_Cuda
@@ -333,6 +388,8 @@ KokkosCore_UnitTest_ROCm: $(OBJ_ROCM) $(KOKKOS_LINK_DEPENDS)
 
 KokkosCore_UnitTest_Threads: $(OBJ_THREADS) $(KOKKOS_LINK_DEPENDS)
 	$(LINK) $(EXTRA_PATH) $(OBJ_THREADS) $(KOKKOS_LIBS) $(LIB) $(KOKKOS_LDFLAGS) $(LDFLAGS) -o KokkosCore_UnitTest_Threads
+KokkosCore_UnitTest_CilkPlus.mwx: $(OBJ_CILKPLUS) $(KOKKOS_LINK_DEPENDS)
+	$(LINK) $(EXTRA_PATH) $(OBJ_CILKPLUS) $(KOKKOS_LIBS) $(LIB) $(KOKKOS_LDFLAGS) $(LDFLAGS) -o KokkosCore_UnitTest_CilkPlus.mwx
 
 KokkosCore_UnitTest_OpenMP: $(OBJ_OPENMP) $(KOKKOS_LINK_DEPENDS)
 	$(LINK) $(EXTRA_PATH) $(OBJ_OPENMP) $(KOKKOS_LIBS) $(LIB) $(KOKKOS_LDFLAGS) $(LDFLAGS) -o KokkosCore_UnitTest_OpenMP
@@ -381,6 +438,8 @@ test-cuda: KokkosCore_UnitTest_Cuda
 test-rocm: KokkosCore_UnitTest_ROCm
 	./KokkosCore_UnitTest_ROCm
 
+test-cilkplus: KokkosCore_UnitTest_CilkPlus.mwx
+	./KokkosCore_UnitTest_CilkPlus.mwx
 test-threads: KokkosCore_UnitTest_Threads
 	./KokkosCore_UnitTest_Threads
 
@@ -433,3 +492,9 @@ clean: kokkos-clean
 
 gtest-all.o:$(GTEST_PATH)/gtest/gtest-all.cc
 	$(CXX) $(KOKKOS_CPPFLAGS) $(KOKKOS_CXXFLAGS) $(CXXFLAGS) $(EXTRA_INC) -c $(GTEST_PATH)/gtest/gtest-all.cc
+UnitTestEmuMain.o:./emu-test/UnitTestEmuMain.cpp
+	$(CXX) $(KOKKOS_CPPFLAGS) $(KOKKOS_CXXFLAGS) $(CXXFLAGS) $(EXTRA_INC) -c ./emu-test/UnitTestEmuMain.cpp
+emu-test.o:./emu-test/emu-test.cpp
+	$(CXX) $(KOKKOS_CPPFLAGS) $(KOKKOS_CXXFLAGS) $(CXXFLAGS) $(EXTRA_INC) -c ./emu-test/emu-test.cpp
+streamimport.o:./emu-test/streamimport.cpp
+	$(CXX) $(KOKKOS_CPPFLAGS) $(KOKKOS_CXXFLAGS) $(CXXFLAGS) $(EXTRA_INC) -c ./emu-test/streamimport.cpp
