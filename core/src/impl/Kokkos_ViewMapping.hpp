@@ -57,6 +57,9 @@
 #if defined(KOKKOS_ENABLE_PROFILING)
 #include <impl/Kokkos_Profiling_Interface.hpp>
 #endif
+#if defined(KOKKOS_ENABLE_EMU)
+#include <Kokkos_EmuSpace.hpp>
+#endif
 
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
@@ -2219,7 +2222,7 @@ public:
     }
 
   //----------------------------------------
-  // Subview construction
+  // Subview constructionMemorySpanMask
 
 private:
 
@@ -2277,6 +2280,7 @@ public:
 namespace Kokkos {
 namespace Impl {
 
+#if defined(KOKKOS_ENABLE_EMU)
 template<class Traits, class Enable = void>
 struct HandleTypeImpl;
 
@@ -2307,7 +2311,47 @@ struct HandleTypeImpl< Traits, typename std::enable_if<( Traits::memory_traits::
 
 };
 
+template<class Traits>
+struct HandleTypeImpl< Traits, typename std::enable_if<( std::is_same< typename Traits::memory_space,Kokkos::Experimental::EmuStridedSpace>::value )>::type > {
 
+   typedef typename Traits::value_type value_type;
+
+   void * m_ptr;
+   size_t m_offset;
+   size_t block_size;
+
+   KOKKOS_INLINE_FUNCTION
+   HandleTypeImpl() : m_ptr(nullptr) {
+       m_offset = 0;
+   }
+   
+   KOKKOS_INLINE_FUNCTION
+   HandleTypeImpl(value_type * ptr) {
+      SharedAllocationHeader* pHead = (((SharedAllocationHeader*)ptr)-1);
+      EmuStridedAllocationHeader * pEmuHead = (EmuStridedAllocationHeader*)(((SharedAllocationHeader*)ptr)-1);
+      SharedAllocationRecord<void, void> * pRec = (SharedAllocationRecord<void, void> *)pHead->get_record();
+      m_ptr = pEmuHead->m_stridedData;
+      m_offset = 0;
+      size_t array_size = (pRec->size() + sizeof(SharedAllocationHeader)) / sizeof(value_type);
+      block_size = array_size / NODELETS();
+   }
+
+   KOKKOS_INLINE_FUNCTION
+   HandleTypeImpl( HandleTypeImpl const arg_data_ptr, size_t offset ) : m_ptr( arg_data_ptr.m_ptr ) { 
+      m_offset = offset / sizeof(value_type);
+      block_size = arg_data_ptr.block_size;
+   }
+
+   KOKKOS_FORCEINLINE_FUNCTION
+   value_type & operator [](size_t offset) const {
+       size_t lOff = offset + m_offset;
+       value_type * pRef = (value_type*)mw_arrayindex(m_ptr, lOff/block_size, NODELETS(),  block_size * sizeof(value_type));
+       
+       return *(&pRef[lOff%block_size]);
+   }   
+
+};
+#endif
 
 
 /** \brief  ViewDataHandle provides the type of the 'data handle' which the view
@@ -2509,7 +2553,7 @@ struct ViewDataHandle< Traits ,
                             &&
                            (Traits::memory_traits::LocalOnly       // These are really mutually exclusive, but the handle_type impl 
                             ||                                     // will deal with that...
-                            Traits::memory_traits::Replicated
+                            std::is_same< typename Traits::memory_space,Kokkos::Experimental::EmuStridedSpace>::value
                             ||
                             Traits::memory_traits::ForceRemote)
                           )>::type >
@@ -2523,7 +2567,7 @@ struct ViewDataHandle< Traits ,
   static handle_type assign( value_type * arg_data_ptr
                            , track_type const & /*arg_tracker*/ )
   {
-    printf("assign vdh with pointer \n");
+//    printf("assign vdh with pointer \n");
     return handle_type( arg_data_ptr );
   }
 
@@ -2531,7 +2575,7 @@ struct ViewDataHandle< Traits ,
   static handle_type assign( handle_type const arg_data_ptr
                            , size_t offset )
   {
-    printf("assign vdh with const handle \n");
+//    printf("assign vdh with const handle \n");
     return handle_type( arg_data_ptr, offset );
   }
 }; 
@@ -2555,27 +2599,28 @@ namespace Impl {
  *  Secondarily to have two fewer partial specializations.
  */
 template< class ExecSpace
+        , class HandleType
         , class ValueType
         , bool IsScalar = std::is_scalar< ValueType >::value
         >
 struct ViewValueFunctor ;
 
-template< class ExecSpace , class ValueType >
-struct ViewValueFunctor< ExecSpace , ValueType , false /* is_scalar */ >
+template< class ExecSpace , class HandleType, class ValueType >
+struct ViewValueFunctor< ExecSpace , HandleType , ValueType, false /* is_scalar */ >
 {
   typedef Kokkos::RangePolicy< ExecSpace > PolicyType ;
   typedef typename ExecSpace::execution_space Exec;
-
+  
   Exec        space ;
-  ValueType * ptr ;
+  HandleType  ptr ;
   size_t      n ;
   bool        destroy ;
 
   KOKKOS_INLINE_FUNCTION
   void operator()( const size_t i ) const
     {
-      if ( destroy ) { (ptr+i)->~ValueType(); } //KOKKOS_IMPL_CUDA_CLANG_WORKAROUND this line causes ptax error __cxa_begin_catch in nested_view unit-test
-      else           { new (ptr+i) ValueType(); }
+      if ( destroy ) { (&ptr[i])->~ValueType(); } //KOKKOS_IMPL_CUDA_CLANG_WORKAROUND this line causes ptax error __cxa_begin_catch in nested_view unit-test
+      else           { new (&ptr[i]) ValueType(); }
     }
 
   ViewValueFunctor() = default ;
@@ -2583,7 +2628,7 @@ struct ViewValueFunctor< ExecSpace , ValueType , false /* is_scalar */ >
   ViewValueFunctor & operator = ( const ViewValueFunctor & ) = default ;
 
   ViewValueFunctor( ExecSpace   const & arg_space
-                  , ValueType * const arg_ptr
+                  , HandleType  const arg_ptr
                   , size_t      const arg_n )
     : space( arg_space )
     , ptr( arg_ptr )
@@ -2624,13 +2669,13 @@ struct ViewValueFunctor< ExecSpace , ValueType , false /* is_scalar */ >
 };
 
 
-template< class ExecSpace , class ValueType >
-struct ViewValueFunctor< ExecSpace , ValueType , true /* is_scalar */ >
+template< class ExecSpace , class HandleType, class ValueType >
+struct ViewValueFunctor< ExecSpace , HandleType , ValueType, true /* is_scalar */ >
 {
   typedef Kokkos::RangePolicy< ExecSpace > PolicyType ;
-
+  
   ExecSpace   space ;
-  ValueType * ptr ;
+  HandleType  ptr ;
   size_t      n ;
 
   KOKKOS_INLINE_FUNCTION
@@ -2642,7 +2687,7 @@ struct ViewValueFunctor< ExecSpace , ValueType , true /* is_scalar */ >
   ViewValueFunctor & operator = ( const ViewValueFunctor & ) = default ;
 
   ViewValueFunctor( ExecSpace   const & arg_space
-                  , ValueType * const arg_ptr
+                  , HandleType  const arg_ptr
                   , size_t      const arg_n )
     : space( arg_space )
     , ptr( arg_ptr )
@@ -2651,9 +2696,10 @@ struct ViewValueFunctor< ExecSpace , ValueType , true /* is_scalar */ >
 
   void construct_shared_allocation()
     {
-      if ( ! space.in_parallel() ) {
-        printf("executing parallel initializer !!!\n");
-        fflush(stdout);
+//      if ( ! space.in_parallel() ) {
+      if ( false ) {
+//        printf("executing parallel initializer A !!!\n");
+//        fflush(stdout);
 #if defined(KOKKOS_ENABLE_PROFILING)
         uint64_t kpID = 0;
         if(Kokkos::Profiling::profileLibraryLoaded()) {
@@ -2673,10 +2719,14 @@ struct ViewValueFunctor< ExecSpace , ValueType , true /* is_scalar */ >
       else {
         for ( size_t i = 0 ; i < n ; ++i ) operator()(i);
       }
+      printf("exiting initializer A !!!\n");
+      fflush(stdout);
     }
 
   void destroy_shared_allocation() {}
 };
+
+
 
 //----------------------------------------------------------------------------
 /** \brief  View mapping for non-specialized data type and standard layout */
@@ -2913,7 +2963,7 @@ public:
     typedef typename alloc_prop::execution_space  execution_space ;
     typedef typename Traits::memory_space         memory_space ;
     typedef typename Traits::value_type           value_type ;
-    typedef ViewValueFunctor< execution_space , value_type > functor_type ;
+    typedef ViewValueFunctor< execution_space , handle_type, value_type > functor_type ;
     typedef Kokkos::Impl::SharedAllocationRecord< memory_space , functor_type > record_type ;
 
     // Query the mapping for byte-size of allocation.
@@ -2953,12 +3003,15 @@ public:
       // Assume destruction is only required when construction is requested.
       // The ViewValueFunctor has both value construction and destruction operators.
       record->m_destroy = functor_type( ( (Kokkos::Impl::ViewCtorProp<void,execution_space> const &) arg_prop).value
-                                      , (value_type *) &m_impl_handle[0]
+                                      , m_impl_handle
                                       , m_impl_offset.span()
                                       );
 
       // Construct values
       record->m_destroy.construct_shared_allocation();
+
+//      printf("initialization complete \n");
+//      fflush(stdout);
     }
 
     return record ;

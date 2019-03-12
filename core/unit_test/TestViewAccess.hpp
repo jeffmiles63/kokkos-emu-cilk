@@ -52,23 +52,40 @@ void TestViewAccess( int N ) {
    }
    printf("local memory view test complete\n");
 */
+   {
+      Kokkos::View< Scalar*, Kokkos::Experimental::EmuReplicatedSpace > replicated_space_view( "replicated", N );   
+      printf("Testing access to replicated space view\n");
+      fflush(stdout);
 
-   Kokkos::View< Scalar*, Kokkos::Experimental::EmuReplicatedSpace > replicated_space_view( "replicated", N );   
-   Kokkos::View< Scalar*, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::ForceRemote> > global_space_view( "global", N );
-//   Kokkos::View< Scalar*, Kokkos::HostSpace, Kokkos::MemoryTraits<0> > global_space_view( "global", N );      
-
-   printf("Testing access to replicated space view\n");
-   fflush(stdout);
-
-   for (int i = 0; i < N; i++) {
-      replicated_space_view(i) = (Scalar)i;
+      for (int i = 0; i < N; i++) {
+         replicated_space_view(i) = (Scalar)i;
+      }
    }
-   printf("Testing access to global space view\n");
-   fflush(stdout);
 
-   for (int i = 0; i < N; i++) {      
-      MIGRATE(&refPtr[i%NODELETS()]);
-      global_space_view(i) = (Scalar)i;
+   {
+      Kokkos::View< Scalar*, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::ForceRemote> > global_space_view( "global", N );
+//      Kokkos::View< Scalar*, Kokkos::HostSpace, Kokkos::MemoryTraits<0> > global_space_view( "global", N );      
+
+
+      printf("Testing access to global space view\n");
+      fflush(stdout);
+
+      for (int i = 0; i < N; i++) {      
+         MIGRATE(&refPtr[i%NODELETS()]);
+         global_space_view(i) = (Scalar)i;
+      }
+   }
+   
+   {
+      Kokkos::View< Scalar*, Kokkos::Experimental::EmuStridedSpace > strided_space_view( "strided", N );   
+
+      printf("Testing access to strided space view\n");
+      fflush(stdout);
+
+      for (int i = 0; i < N; i++) {      
+         MIGRATE(&refPtr[i%NODELETS()]);
+         strided_space_view(i) = (Scalar)i;
+      }
    }
 
 

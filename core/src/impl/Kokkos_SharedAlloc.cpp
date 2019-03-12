@@ -216,6 +216,8 @@ SharedAllocationRecord(
   , m_next( 0 )
 #endif
   , m_count( 0 )
+  , m_custom_inc( nullptr )
+  , m_custom_dec( nullptr )
 {
   
   if ( 0 != m_alloc_ptr ) {
@@ -275,8 +277,8 @@ SharedAllocationRecord< void , void > *
 SharedAllocationRecord< void , void >::
 custom_decrement( Kokkos::Impl::SharedAllocationRecord< void , void > * rec) {
    if ( rec->m_custom_dec != nullptr ) {
-        printf("calling m_custom_dec\n");
-        fflush(stdout);
+//        printf("calling m_custom_dec\n");
+//        fflush(stdout);
         return (SharedAllocationRecord< void , void > *)rec->m_custom_dec( (void*)rec );
    } else {
       return SharedAllocationRecord< void , void >::decrement(rec);

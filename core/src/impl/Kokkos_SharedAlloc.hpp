@@ -94,6 +94,9 @@ private:
   char     m_label[ maximum_label_length ];
 
 public:
+  Record * get_record( ) {
+     return m_record;
+  }
 
   /* Given user memory get pointer to the header */
   KOKKOS_INLINE_FUNCTION static
@@ -258,7 +261,9 @@ private:
     /*  Allocate user memory as [ SharedAllocationHeader , user_memory ] */
     : SharedAllocationRecord< MemorySpace , void >( arg_space , arg_label , arg_alloc , & Kokkos::Impl::deallocate< MemorySpace , DestroyFunctor > )
     , m_destroy()
-    {printf("destroy function constructor\n");}
+    {
+      //printf("destroy function constructor\n");
+    }
 
   SharedAllocationRecord() = delete ;
   SharedAllocationRecord( const SharedAllocationRecord & ) = delete ;
@@ -277,7 +282,7 @@ public:
                                    , const size_t        arg_alloc
                                    )
     {
-      printf("Shared Alloc const with destroyer\n"); fflush(stdout);
+//      printf("Shared Alloc const with destroyer\n"); fflush(stdout);
 #if defined( KOKKOS_ACTIVE_EXECUTION_MEMORY_SPACE_HOST )
       return new SharedAllocationRecord( arg_space , arg_label , arg_alloc );
 #else
@@ -407,8 +412,8 @@ public:
   KOKKOS_FORCEINLINE_FUNCTION
   ~SharedAllocationTracker()
     { 
-      printf("tracker destructor...\n");
-      fflush(stdout);
+//      printf("tracker destructor...\n");
+//      fflush(stdout);
       KOKKOS_IMPL_SHARED_ALLOCATION_TRACKER_DECREMENT 
     }
 

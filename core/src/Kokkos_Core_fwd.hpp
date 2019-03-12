@@ -133,6 +133,11 @@ class ROCm ;                 ///< Execution space for ROCm GPU
 #if defined( KOKKOS_ENABLE_CILKPLUS )
 namespace Experimental {
 class CilkPlus;    ///< Execution space main process on CPU.
+#if defined(KOKKOS_ENABLE_EMU)
+class EmuReplicatedSpace;
+class EmuLocalSpace;
+class EmuStridedSpace;
+#endif
 }
 #endif
 
