@@ -1055,7 +1055,10 @@ struct FunctorValueInit< FunctorType , ArgTag , T & , Enable >
 {
   KOKKOS_FORCEINLINE_FUNCTION static
   T & init( const FunctorType & , void * p )
-    { return *( new(p) T() ); };
+    { 
+		printf("FunctorValueInit -- using scalar %d, %08x \n", (int)T(), p);
+		return *( new(p) T() ); 
+	}
 };
 
 /* No 'init' function provided for array value */
@@ -1065,6 +1068,7 @@ struct FunctorValueInit< FunctorType , ArgTag , T * , Enable >
   KOKKOS_FORCEINLINE_FUNCTION static
   T * init( const FunctorType & f , void * p )
     {
+      printf("FunctorValueInit -- using array\n");
       const int n = FunctorValueTraits< FunctorType , ArgTag >::value_count(f);
       for ( int i = 0 ; i < n ; ++i ) { new( ((T*)p) + i ) T(); }
       return (T*)p ;
@@ -1084,7 +1088,10 @@ struct FunctorValueInit
 {
   KOKKOS_FORCEINLINE_FUNCTION static
   T & init( const FunctorType & f , void * p )
-    { f.init( *((T*)p) ); return *((T*)p) ; }
+    { 
+		printf("FunctorValueInit -- calling init\n");
+		f.init( *((T*)p) ); return *((T*)p) ; 
+	}
 };
 
 /* 'init' function provided for array value */
@@ -1100,7 +1107,10 @@ struct FunctorValueInit
 {
   KOKKOS_FORCEINLINE_FUNCTION static
   T * init( const FunctorType & f , void * p )
-    { f.init( (T*)p ); return (T*)p ; }
+    { 
+		printf("FunctorValueInit -- calling init\n");
+		f.init( (T*)p ); return (T*)p ; 
+	}
 };
 
 /* 'init' function provided for single value */

@@ -173,6 +173,7 @@ void * HostSpace::allocate( const size_t arg_alloc_size ) const
   void * ptr = 0 ;
 
   if ( arg_alloc_size ) {
+	//printf("allocating host space record: %d\n", arg_alloc_size);
 
     if ( m_alloc_mech == STD_MALLOC ) {
       // Over-allocate to and round up to guarantee proper alignment.

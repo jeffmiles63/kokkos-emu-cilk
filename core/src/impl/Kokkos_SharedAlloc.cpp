@@ -47,33 +47,48 @@ namespace Kokkos {
 namespace Impl {
 
 AddrLock * getAddrLock(unsigned long addr) {
-   AddrLock * pReturn = NULL;
-   MIGRATE((void *)&list_mutex);
-   if (ATOMIC_CAS(&list_mutex, 1L, 0L) == 0L) {
-      AddrLock * pWork = lockList;
+   unsigned long lAddr = (unsigned long)mw_ptr1to0(addr);
+   AddrLock * pReturn = NULL;   
+   //printf("obtaining address lock %08x...: %d \n", lockList, NODE_ID());
+   //fflush(stdout);
+   if (ATOMIC_CAS(&list_mutex, 1L, 0L) == 0L) {	  
+	  //printf("mutex locked...\n");
+	  //fflush(stdout);
+      AddrLock * pWork = (AddrLock*)mw_ptr1to0(lockList);
       while (pWork != NULL) {
-         if (pWork->id == addr) {
+         //printf("inner lock loop lock %08x... %d \n", pWork, NODE_ID());
+         //fflush(stdout);
+		  
+         if (pWork->id == lAddr) {
+			 //printf("addr lock acquired \n");
              break;
          }
          pWork = pWork->pNext;
       }
       if (pWork == NULL) {
-         pWork = new AddrLock(addr);
+		 //printf("creating new addr lock \n");
+         pWork = mw_ptr1to0( new AddrLock(lAddr) );
          pWork->pNext = lockList;
          lockList = pWork;
       }
       pReturn = pWork;
       ATOMIC_SWAP( &list_mutex, 0L);
+      //printf("mutex unlocked...\n");
+      //fflush(stdout);
    }
+   //printf("returning address lock %08x... \n", pReturn);
+   //fflush(stdout);
    return pReturn;
 }
 
 bool lock_addr( unsigned long addr ) {
   AddrLock * pWork = getAddrLock( addr );
   if ( pWork != NULL ) {
-//    printf("obtaining lock %ld: %ld ==> ", addr, pWork->lock);
+//    printf("obtaining lock %08x: %ld ==> ", addr, pWork->lock);
+//    fflush(stdout);
     long nReturn = ATOMIC_CAS(&(pWork->lock), 1L, 0L);
 //    printf("%ld \n ", nReturn);
+//    fflush(stdout);
     return ( nReturn == 0L );
   }
   else 
@@ -84,11 +99,11 @@ void unlock_addr( unsigned long addr ) {
   while (true) {
      AddrLock * pWork = getAddrLock( addr );
      if ( pWork != NULL ) {
-//       printf("releasing lock %ld: %ld \n", addr, pWork->lock);
+//       printf("releasing lock %08x: %ld \n", addr, pWork->lock);
+//       fflush(stdout);
        ATOMIC_SWAP(&(pWork->lock), 0L);
        break;
-     }
-     RESCHEDULE();
+     }     
   }
 }
 
@@ -266,10 +281,16 @@ void
 SharedAllocationRecord< void , void >::
 custom_increment( Kokkos::Impl::SharedAllocationRecord< void , void > * rec) {
    if ( rec->m_custom_inc != nullptr ) {
-        rec->m_custom_inc( (void*)rec );
+//	   printf("calling custom increment...\n");
+//	   fflush(stdout);
+       rec->m_custom_inc( (void*)rec );
    } else {
+//	  printf("calling default increment because no custom assigned\n");
+//	  fflush(stdout);
       SharedAllocationRecord< void , void >::increment( rec );
    }  
+//   printf("this has nothing to do with increment :) \n");
+   fflush(stdout);
 }
 
 
@@ -277,10 +298,12 @@ SharedAllocationRecord< void , void > *
 SharedAllocationRecord< void , void >::
 custom_decrement( Kokkos::Impl::SharedAllocationRecord< void , void > * rec) {
    if ( rec->m_custom_dec != nullptr ) {
-//        printf("calling m_custom_dec\n");
-//        fflush(stdout);
+        //printf("calling m_custom_dec\n");
+        //fflush(stdout);
         return (SharedAllocationRecord< void , void > *)rec->m_custom_dec( (void*)rec );
    } else {
+      //printf("calling decrement\n");
+      //fflush(stdout);
       return SharedAllocationRecord< void , void >::decrement(rec);
    }
 }
@@ -344,6 +367,8 @@ decrement( SharedAllocationRecord< void , void > * arg_record )
     arg_record->m_prev = 0 ;
 #endif
 
+//printf("calling dealloc functor");
+//fflush(stdout);
     function_type d = arg_record->m_dealloc ;
     (*d)( arg_record );
     arg_record = 0 ;

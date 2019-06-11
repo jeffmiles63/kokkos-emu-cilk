@@ -219,20 +219,30 @@ T AddLoop( int loop ) {
   Kokkos::parallel_for( loop, f_add );
   execution_space::fence();
 
+
   Kokkos::deep_copy( h_data, data );
+
   T val = h_data();
 
+/*
+  printf("assigning ref data... \n");
+  fflush(stdout);
   struct AddFunctorReduce< T, execution_space > f_add_red;
   f_add_red.data = data;
   int dummy_result;
+  printf("starting reduce loop... \n");
+  fflush(stdout);  
   Kokkos::parallel_reduce( loop, f_add_red , dummy_result );
   execution_space::fence();
-
+  printf("finishing add loop parallel \n");
+  fflush(stdout);*/
   return val;
 }
 
 template< class T >
 T AddLoopSerial( int loop ) {
+  printf("starting add loop serial\n");
+  fflush(stdout);
   T* data = new T[1];
   data[0] = 0;
 
@@ -307,13 +317,13 @@ T CASLoop( int loop ) {
 
   Kokkos::deep_copy( h_data, data );
   T val = h_data();
-
+/*
   struct CASFunctorReduce< T, execution_space > f_cas_red;
   f_cas_red.data = data;
   int dummy_result;
   Kokkos::parallel_reduce( loop, f_cas_red , dummy_result );
   execution_space::fence();
-
+*/
   return val;
 }
 
@@ -399,14 +409,14 @@ T ExchLoop( int loop ) {
   Kokkos::deep_copy( h_data, data );
   Kokkos::deep_copy( h_data2, data2 );
   T val = h_data() + h_data2();
-
+/*
   struct ExchFunctorReduce< T, execution_space > f_exch_red;
   f_exch_red.data = data;
   f_exch_red.data2 = data2;
   int dummy_result;
   Kokkos::parallel_reduce( loop, f_exch_red , dummy_result );
   execution_space::fence();
-
+*/
   return val;
 }
 
@@ -476,6 +486,8 @@ T LoopVariantSerial( int loop, int test ) {
 template< class T, class DeviceType >
 bool Loop( int loop, int test )
 {
+  printf("running test: %d \n", test );
+  fflush(stdout);
   T res       = LoopVariant< T, DeviceType >( loop, test );
   T resSerial = LoopVariantSerial< T >( loop, test );
 
@@ -501,7 +513,7 @@ namespace Test {
 
 TEST_F( TEST_CATEGORY, atomics )
 {
-  const int loop_count = 10000;
+  const int loop_count = 10;
 
   ASSERT_TRUE( ( TestAtomic::Loop< int, TEST_EXECSPACE >( loop_count, 1 ) ) );
   ASSERT_TRUE( ( TestAtomic::Loop< int, TEST_EXECSPACE >( loop_count, 2 ) ) );

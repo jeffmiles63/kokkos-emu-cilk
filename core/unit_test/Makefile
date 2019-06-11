@@ -31,16 +31,18 @@ else
   CXX = g++
 endif
 
-CXXFLAGS = -O3
+CXXFLAGS = -O3 
 LINK ?= $(CXX)
-LDFLAGS ?=
+LDFLAGS ?= 
 ifneq ($(KOKKOS_ENABLE_EMU), 1)
 override LDFLAGS += -lpthread
+else
+override LDFLAGS += -lemu_c_utils
 endif
 
 include $(KOKKOS_PATH)/Makefile.kokkos
 
-KOKKOS_CXXFLAGS += -I${KOKKOS_PATH}/core/unit_test
+KOKKOS_CXXFLAGS += -I${KOKKOS_PATH}/core/unit_test -I${KOKKOS_PATH}/tpls/mdspan/include
 ifeq ($(KOKKOS_ENABLE_EMU), 1)
 KOKKOS_CXXFLAGS += -I${KOKKOS_PATH}/core/unit_test/emu-test
 else
@@ -149,7 +151,6 @@ ifeq ($(KOKKOS_INTERNAL_USE_CILKPLUS), 1)
    endif
 ##        OBJ_CILKPLUS += TestCilkPlus_Init.o
 ##        OBJ_CILKPLUS += TestCilkPlus_SharedAlloc.o
-        OBJ_CILKPLUS += TestViewMemoryTraits.o
 ##        OBJ_CILKPLUS += TestCilkPlus_RangePolicy.o
 ##        OBJ_CILKPLUS += TestCilkPlus_ViewAPI_b.o
 ##        OBJ_CILKPLUS += TestCilkPlus_ViewMapping_a.o TestCilkPlus_ViewMapping_b.o TestCilkPlus_ViewMapping_subview.o
@@ -164,6 +165,7 @@ ifeq ($(KOKKOS_INTERNAL_USE_CILKPLUS), 1)
 ##        OBJ_CILKPLUS += TestCilkPlus_Complex.o
 ##        OBJ_CILKPLUS += TestCilkPlus_AtomicOperations.o TestCilkPlus_AtomicViews.o 
 ##        OBJ_CILKPLUS += TestCilkPlus_Atomics.o
+        OBJ_CILKPLUS += TestViewMemoryTraits.o        
 ##        OBJ_CILKPLUS += TestCilkPlus_Team.o TestCilkPlus_TeamScratch.o
 ##        OBJ_CILKPLUS += TestCilkPlus_TeamReductionScan.o
 ##        OBJ_CILKPLUS += TestCilkPlus_Other.o

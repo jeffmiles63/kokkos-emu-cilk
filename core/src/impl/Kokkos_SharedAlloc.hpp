@@ -353,6 +353,8 @@ public:
   void assign_allocated_record_to_uninitialized( Record * arg_record )
     {
       if ( arg_record ) {
+//		printf("incrementing...\n");
+//		fflush(stdout);
 #if defined(KOKKOS_ENABLE_EMU)
         Record::custom_increment( m_record = arg_record );
 #else
@@ -360,6 +362,7 @@ public:
 #endif
       }
       else {
+//		printf("nothing to do here...set do not deref\n");
         m_record_bits = DO_NOT_DEREF_FLAG ;
       }
     }

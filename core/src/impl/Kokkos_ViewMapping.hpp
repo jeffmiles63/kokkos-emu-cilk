@@ -2331,6 +2331,7 @@ struct HandleTypeImpl< Traits, typename std::enable_if<( std::is_same< typename 
       EmuStridedAllocationHeader * pEmuHead = (EmuStridedAllocationHeader*)(((SharedAllocationHeader*)ptr)-1);
       SharedAllocationRecord<void, void> * pRec = (SharedAllocationRecord<void, void> *)pHead->get_record();
       m_ptr = pEmuHead->m_stridedData;
+//      printf("strided data handle: %08x, %08x", (unsigned long) pEmuHead, (unsigned long)pRec);
       m_offset = 0;
       size_t array_size = (pRec->size() + sizeof(SharedAllocationHeader)) / sizeof(value_type);
       block_size = array_size / NODELETS();
@@ -2347,6 +2348,8 @@ struct HandleTypeImpl< Traits, typename std::enable_if<( std::is_same< typename 
        size_t lOff = offset + m_offset;
        value_type * pRef = (value_type*)mw_arrayindex(m_ptr, lOff/block_size, NODELETS(),  block_size * sizeof(value_type));
        
+//       printf("offset: %ld, block_size: %ld \n", lOff, block_size);
+//       fflush(stdout);
        return *(&pRef[lOff%block_size]);
    }   
 
@@ -2719,8 +2722,8 @@ struct ViewValueFunctor< ExecSpace , HandleType , ValueType, true /* is_scalar *
       else {
         for ( size_t i = 0 ; i < n ; ++i ) operator()(i);
       }
-      printf("exiting initializer A !!!\n");
-      fflush(stdout);
+//      printf("exiting initializer A !!!\n");
+//      fflush(stdout);
     }
 
   void destroy_shared_allocation() {}
@@ -2979,15 +2982,16 @@ public:
     const size_t alloc_size =
       ( m_impl_offset.span() * MemorySpanSize + MemorySpanMask ) & ~size_t(MemorySpanMask);
     
-    long node_id = NODE_ID();
-    printf("View Mapping allocating memory in space: %s - %d, %d  \n", memory_space::name(), alloc_size, node_id );
-    fflush(stdout);
+//    long node_id = NODE_ID();
+//    printf("View Mapping allocating memory in space: %s - %d, %d  \n", memory_space::name(), alloc_size, node_id );
+//    fflush(stdout);
 
     // Create shared memory tracking record with allocate memory from the memory space
     record_type * const record =
       record_type::allocate( ( (Kokkos::Impl::ViewCtorProp<void,memory_space> const &) arg_prop ).value
                            , ( (Kokkos::Impl::ViewCtorProp<void,std::string>  const &) arg_prop ).value
                            , alloc_size );
+
 
 #ifdef KOKKOS_ENABLE_DEPRECATED_CODE
     if ( alloc_size ) {
@@ -2997,6 +3001,10 @@ public:
     }
 #endif
 
+
+//   printf("initializing deallocator... \n");
+//    fflush(stdout);
+/*
     //  Only initialize if the allocation is non-zero.
     //  May be zero if one of the dimensions is zero.
     if ( alloc_size && alloc_prop::initialize ) {
@@ -3009,10 +3017,10 @@ public:
 
       // Construct values
       record->m_destroy.construct_shared_allocation();
-
-//      printf("initialization complete \n");
-//      fflush(stdout);
-    }
+*/
+ //     printf("initialization complete \n");
+ //     fflush(stdout);
+//    }
 
     return record ;
   }

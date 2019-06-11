@@ -186,20 +186,18 @@ T local_atomic_add ( volatile T * const dest, const T val )
 {
    T rVal = *dest;
    for (; ; ) {
-//        printf("atomic_add: %ld, %ld \n",*dest, val);
+        //printf("atomic_add: %ld, %ld \n",*dest, val);
+        //fflush(stdout);
      if (Impl::lock_addr((unsigned long)dest)) {
-        MIGRATE((void *)dest);
-        ENTER_CRITICAL_SECTION();        
         rVal = *dest;
         T new_value = rVal + val;
         *dest = new_value;
-        EXIT_CRITICAL_SECTION();
         Impl::unlock_addr((unsigned long)dest);
         break;
-     }
-     MIGRATE((void *)dest);
-     RESCHEDULE();
+     }   
+     RESCHEDULE();  
    }   
+   //printf("<-- add %d \n", rVal);
    return rVal;
 }
 
