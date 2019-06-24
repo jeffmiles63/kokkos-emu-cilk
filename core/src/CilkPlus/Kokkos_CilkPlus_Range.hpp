@@ -70,7 +70,7 @@ private:
           int_loop = (len / par_loop) + ( ( (len % par_loop) == 0) ? 0 : 1 );
       
 #ifdef KOKKOS_CILK_USE_PARALLEL_FOR
-      printf(" cilk parallel for: b= %d, e = %d, l = %d, par = %d, int = %d \n", b, e, len, par_loop, int_loop);
+      //printf(" cilk parallel for: b= %d, e = %d, l = %d, par = %d, int = %d \n", b, e, len, par_loop, int_loop);
       cilk_for (typename Policy::member_type i = 0 ; i < par_loop ; ++i ) {
          for ( typename Policy::member_type j = (int_loop * i); j < ( (int_loop * i) + int_loop); j++ ) {
            if (j < e)
@@ -103,7 +103,7 @@ private:
           int_loop = (len / par_loop) + ( ( (len % par_loop) == 0) ? 0 : 1 );
       
 #ifdef KOKKOS_CILK_USE_PARALLEL_FOR      
-      printf("T parallel for: b= %d, e = %d, l = %d, par = %d, int = %d \n", b, e, len, par_loop, int_loop);
+      //printf("T parallel for: b= %d, e = %d, l = %d, par = %d, int = %d \n", b, e, len, par_loop, int_loop);
       cilk_for (typename Policy::member_type i = 0 ; i < par_loop ; ++i ) {
          for ( typename Policy::member_type j = (int_loop * i); j < ( (int_loop * i) + int_loop); j++ ) {
            if (j < e)
@@ -170,22 +170,22 @@ private:
   void internal_reduce(const typename Policy::member_type e, int par_size, int int_loop, int i, void* i_ptr, const size_t l_alloc_bytes) const {
 	 int array_ndx = i / par_size; 
 	 cilk_reducer_wrapper* pReducer = get_reducer<cilk_reducer_wrapper>(array_ndx);
-	 printf("[%d.%d] internal reduce: %08x, %d, %d, %d \n", NODE_ID(), THREAD_ID(), (unsigned long)pReducer, e, par_size, i);
-	 Kokkos::Experimental::print_pointer(i, pReducer, "reducer pointer" );
-	 fflush(stdout);         
-     printf("obtaining update pointer: %d, %d \n", i, array_ndx);          
+	 //printf("[%d.%d] internal reduce: %08x, %d, %d, %d \n", NODE_ID(), THREAD_ID(), (unsigned long)pReducer, e, par_size, i);
+	 //Kokkos::Experimental::print_pointer(i, pReducer, "reducer pointer" );
+	 //fflush(stdout);         
+     //printf("obtaining update pointer: %d, %d \n", i, array_ndx);          
      pointer_type pRef = (pointer_type)mw_arrayindex((void*)i_ptr, array_ndx, NODELETS(),  l_alloc_bytes * par_size);
-     Kokkos::Experimental::print_pointer(i, pRef, "internal reduce (outer)" );
-     Kokkos::Experimental::print_pointer(i, &pRef[i%par_size], "internal reduce (inner)" );
-     printf("[%d] obtaining update reference %d, %d: %08x, offset %d\n", NODE_ID(), i, array_ndx, pRef, i%par_size);
+     //Kokkos::Experimental::print_pointer(i, pRef, "internal reduce (outer)" );
+     //Kokkos::Experimental::print_pointer(i, &pRef[i%par_size], "internal reduce (inner)" );
+     //printf("[%d] obtaining update reference %d, %d: %08x, offset %d\n", NODE_ID(), i, array_ndx, pRef, i%par_size);
      //reference_type lupdate = ValueInit::init(  pReducer->f , &pRef[i%par_size] );
      reference_type lupdate = pRef[i%par_size] = 0;
-     printf("[%d.%d] pointer node: %d \n", NODE_ID(), THREAD_ID(), mw_ptrtonodelet(&lupdate) );
-     Kokkos::Experimental::print_pointer(i, &lupdate, "entering inner loop" );
+     //printf("[%d.%d] pointer node: %d \n", NODE_ID(), THREAD_ID(), mw_ptrtonodelet(&lupdate) );
+     //Kokkos::Experimental::print_pointer(i, &lupdate, "entering inner loop" );
      
      for ( typename Policy::member_type j = (int_loop * i); j < ( (int_loop * i) + int_loop); j++ ) {
-		printf("[%d] calling functor: %d - %d \n", NODE_ID(), e, (int)j);
-		fflush(stdout);
+		//printf("[%d] calling functor: %d - %d \n", NODE_ID(), e, (int)j);
+		//fflush(stdout);
         if (j < e) {           
            pReducer->f( (const typename Policy::member_type)j , lupdate );
            pReducer->join( lupdate );
@@ -200,12 +200,12 @@ private:
       global_reducer = pMem->allocate(sizeof(cilk_reducer_wrapper)); 
       global_reducer_local = pMem->allocate(sizeof(typename cilk_reducer_wrapper::local_reducer_type));     
       for (int i = 0; i < NODELETS(); i++) {
-		 printf("initializing reducer for node %d\n", i);		 
+		 //printf("initializing reducer for node %d\n", i);		 
 		 cilk_reducer_wrapper* pH = (cilk_reducer_wrapper*)mw_get_localto(global_reducer, &refPtr[i]);         
 		 void* pLocalRed = (void*)mw_get_localto(global_reducer_local, &refPtr[i]);         
 		 new (pLocalRed) NodeletReducer< typename cilk_reducer_wrapper::reduce_container >(cilk_reducer_wrapper::default_value());
          new (pH) cilk_reducer_wrapper(ReducerConditional::select(m_functor , m_reducer), l_alloc_bytes, pLocalRed);
-         Kokkos::Experimental::print_pointer( i, pH, "init reducer" );
+         //Kokkos::Experimental::print_pointer( i, pH, "init reducer" );
       }
   }
 
@@ -229,12 +229,12 @@ private:
       void * w_ptr = mw_malloc2d(par_loop, l_alloc_bytes * par_size);  // one for each thread...
       long * refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
       
-      printf("parallel reduce: b= %d, e = %d, l = %d, par = %d, int = %d \n", b, e, len, par_loop, int_loop);
+      //printf("parallel reduce: b= %d, e = %d, l = %d, par = %d, int = %d \n", b, e, len, par_loop, int_loop);
 //      cilk_for (typename Policy::member_type i = 0 ; i < par_loop ; ++i ) {
 //      }
 
-      printf("internal reduce size = %d ... spawning threads... \n", (int)l_alloc_bytes);
-      fflush(stdout);
+      //printf("internal reduce size = %d ... spawning threads... \n", (int)l_alloc_bytes);
+      //fflush(stdout);
       for (int i = 0; i < par_loop; i++) {
          cilk_spawn_at(&refPtr[i/par_size]) internal_reduce(e, par_size, int_loop, i, w_ptr, l_alloc_bytes);
       }

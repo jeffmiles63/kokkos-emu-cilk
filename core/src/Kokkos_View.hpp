@@ -549,6 +549,70 @@ view_wrap( Args const & ... args )
   return return_type( args... );
 }
 
+template<class ElementType>
+class accessor_strided {
+public:
+  using element_type  = ElementType;
+  using pointer       = ElementType*;
+  using offset_policy = accessor_strided;
+  using reference     = ElementType&;
+  
+  size_t block_size;
+  
+  accessor_strided( const accessor_strided & rhs) = default;
+  accessor_strided & operator = ( const accessor_strided & rhs) = default;
+  accessor_strided( ) : block_size(1) {}
+  accessor_strided( const size_t b_ ) : block_size(b_) {}
+
+  constexpr typename offset_policy::pointer
+    offset( pointer p , ptrdiff_t i ) const noexcept
+    {        
+       element_type * pRef = (pointer)mw_arrayindex(p, i/block_size, NODELETS(),  block_size * sizeof(element_type));
+       return (typename offset_policy::pointer)(&pRef[i%block_size]);
+	}
+
+  constexpr reference access( pointer p , ptrdiff_t i ) const noexcept
+    {        
+       element_type * pRef = static_cast<pointer>(mw_arrayindex(p, i/block_size, 8,  block_size * sizeof(element_type)));
+       return *(&pRef[i%block_size]);
+	}
+
+  constexpr ElementType* decay( pointer p ) const noexcept
+    { return p; }
+};
+
+template<class ElementType>
+class accessor_replicated {
+public:
+  using element_type  = ElementType;
+  using pointer       = ElementType*;
+  using offset_policy = accessor_replicated;
+  using reference     = ElementType&;
+  
+  size_t block_size;
+  
+  accessor_replicated( const accessor_replicated & rhs) = default;
+  accessor_replicated & operator = ( const accessor_replicated & rhs) = default;
+  accessor_replicated( ) : block_size(1) {}
+  accessor_replicated( const size_t b_ ) : block_size(b_) {}
+
+  constexpr typename offset_policy::pointer
+    offset( pointer p , ptrdiff_t i ) const noexcept
+    {        
+       element_type * pRef = (pointer)mw_arrayindex(p, i/block_size, NODELETS(),  block_size * sizeof(element_type));
+       return (typename offset_policy::pointer)(&pRef[i%block_size]);
+	}
+
+  constexpr reference access( pointer p , ptrdiff_t i ) const noexcept
+    {        
+       element_type * pRef = static_cast<pointer>(mw_arrayindex(p, i/block_size, 8,  block_size * sizeof(element_type)));
+       return *(&pRef[i%block_size]);
+	}
+
+  constexpr ElementType* decay( pointer p ) const noexcept
+    { return p; }
+};
+
 struct comp_dimensions {
    typedef Impl::ViewArrayAnalysis< int > scalar ;
    typedef Impl::ViewArrayAnalysis< int* > array_10 ;
@@ -699,13 +763,13 @@ struct mdspan_accessor< traits, typename std::enable_if< std::is_same< typename 
 template< class traits >
 struct mdspan_accessor< traits, typename std::enable_if< std::is_same< typename traits::memory_space,Kokkos::Experimental::EmuStridedSpace >::value &&
                                                          std::is_same< typename traits::memory_traits, Kokkos::MemoryManaged >::value >::type > {
-	typedef accessor_basic< typename traits::value_type > md_accessor;
+	typedef accessor_strided< typename traits::value_type > md_accessor;
 };
 
 template< class traits >
 struct mdspan_accessor< traits, typename std::enable_if< std::is_same< typename traits::memory_space,Kokkos::Experimental::EmuReplicatedSpace >::value &&
                                                          std::is_same< typename traits::memory_traits, Kokkos::MemoryManaged >::value >::type > {
-	typedef accessor_basic< typename traits::value_type > md_accessor;
+	typedef accessor_replicated< typename traits::value_type > md_accessor;
 };
 
 template< class traits >

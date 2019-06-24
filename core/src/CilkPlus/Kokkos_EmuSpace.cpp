@@ -363,10 +363,10 @@ allocate( const char *                  arg_label
    void *vh = pMem->allocate(sizeof(SharedAllocationHeader) + arg_alloc_size);   
                           
    for ( int i = 0; i < NODELETS(); i++) {
-      repl_shared_rec * pRec = (repl_shared_rec*)mw_get_localto(vr,&lRef[i]);
-      SharedAllocationHeader* pH = (SharedAllocationHeader*)mw_get_localto(vh, &lRef[i]);
-      repl_shared_rec::RecordBase* rb = (repl_shared_rec::RecordBase*)mw_get_localto(Kokkos::Experimental::EmuReplicatedSpace::repl_root_record, &lRef[i]);
-      new (pRec) repl_shared_rec( rb, arg_label, arg_alloc_size, pH, (int)NODE_ID() );
+      repl_shared_rec * pRec = (repl_shared_rec*)mw_get_nth(vr,i);
+      SharedAllocationHeader* pH = (SharedAllocationHeader*)mw_get_nth(vh, i);
+      repl_shared_rec::RecordBase* rb = (repl_shared_rec::RecordBase*)mw_get_nth(Kokkos::Experimental::EmuReplicatedSpace::repl_root_record, i);
+      new (pRec) repl_shared_rec( rb, arg_label, arg_alloc_size, pH, (int)i );
    }
    return (SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , void >*)vr;
 }

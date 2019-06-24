@@ -129,7 +129,7 @@ public:
   // copy *val_ 
   inline
   CilkEmuReduceView( rd_value_type * val_ ) {
-     printf("array view constructor: %08x \n", val_);
+     //printf("array view constructor: %08x \n", val_);
      ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
      if (ptr)
      {        
@@ -146,9 +146,9 @@ public:
      ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
      if (ptr)
      {
-        printf("(B) array view join (P): %ld, %ld: %08x, %08x \n", val[0], right[0], val, right);
+        //printf("(B) array view join (P): %ld, %ld: %08x, %08x \n", val[0], right[0], val, right);
         ValueJoin::join( ptr->r, val, right );
-        printf("(A) array view join (P): %ld, %ld: %08x, %08x \n", val[0], right[0], val, right);
+        //printf("(A) array view join (P): %ld, %ld: %08x, %08x \n", val[0], right[0], val, right);
      }  
   }
 
@@ -164,13 +164,13 @@ public:
      } else {
         lVal = val_;
      }
-     printf("create array view memory: %08x, %08x \n", val_, lVal);
+     //printf("create array view memory: %08x, %08x \n", val_, lVal);
      return lVal;
   }
 
   inline 
   static void destroy( rd_value_type * val_ ) {
-     printf("array view destroy: %08x \n", val_);
+     //printf("array view destroy: %08x \n", val_);
      ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
      if (ptr)
      {        
@@ -219,7 +219,7 @@ struct CilkReduceContainer<ReduceWrapper, ReducerType, WorkTagFwd, typename std:
   inline
   void reduce( rd_value_type * left, rd_value_type const * right )
   {
-     printf("array reduce : %ld, %ld, %08x %08x \n", left[0], right[0], left, right);
+     //printf("array reduce : %ld, %ld, %08x %08x \n", left[0], right[0], left, right);
      ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
      if (ptr)
      {
@@ -426,7 +426,7 @@ struct kokkos_cilk_reducer< ReducerType, Functor, defaultType, WorkTagFwd , type
     kokkos_cilk_reducer (const Functor & f_, const size_t l_alloc_bytes, void * ptr_reducer) : local_value(0), f(f_), 
                                                                            r(local_value), alloc_bytes(l_alloc_bytes),
                                                                            local_reducer(reinterpret_cast<local_reducer_type *>(ptr_reducer)) {
-        printf("constructing default scalar reducer (sum), size = %d , addr = %08x\n", (int)l_alloc_bytes, (unsigned long)this );                   
+        //printf("constructing default scalar reducer (sum), size = %d , addr = %08x\n", (int)l_alloc_bytes, (unsigned long)this );                   
     }
 
     void join(defaultType & val_) {
@@ -482,8 +482,8 @@ struct kokkos_cilk_reducer< ReducerType, Functor, defaultType, WorkTagFwd , type
     }
 
     void join(typename reduce_container::rd_value_type * val_) {
-        printf("reducer join: %ld\n", (long)NODE_ID());
-        fflush(stdout);
+        //printf("reducer join: %ld\n", (long)NODE_ID());
+        //fflush(stdout);
         
         typename reduce_container::ViewType * cont = local_reducer->view();
         cont->join( val_ );
