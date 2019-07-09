@@ -58,6 +58,10 @@
 #include <impl/Kokkos_Profiling_Interface.hpp>
 #endif
 
+namespace Kokkos {
+namespace Experimental {
+extern void print_pointer( int i, void* ptr, const char * name );
+} }
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
 
@@ -568,12 +572,14 @@ public:
     offset( pointer p , ptrdiff_t i ) const noexcept
     {        
        element_type * pRef = (pointer)mw_arrayindex(p, i/block_size, NODELETS(),  block_size * sizeof(element_type));
+       //Kokkos::Experimental::print_pointer(i, pRef, "strided offset");
        return (typename offset_policy::pointer)(&pRef[i%block_size]);
 	}
 
   constexpr reference access( pointer p , ptrdiff_t i ) const noexcept
     {        
        element_type * pRef = static_cast<pointer>(mw_arrayindex(p, i/block_size, 8,  block_size * sizeof(element_type)));
+       //Kokkos::Experimental::print_pointer(i, pRef, "strided access");
        return *(&pRef[i%block_size]);
 	}
 
@@ -607,6 +613,40 @@ public:
     {        
        element_type * pRef = static_cast<pointer>(mw_arrayindex(p, i/block_size, 8,  block_size * sizeof(element_type)));
        return *(&pRef[i%block_size]);
+	}
+
+  constexpr ElementType* decay( pointer p ) const noexcept
+    { return p; }
+};
+
+template<class ElementType>
+class accessor_remote {
+public:
+  using element_type  = ElementType;
+  using pointer       = ElementType*;
+  using offset_policy = accessor_remote;
+  using reference     = ElementType&;
+  
+  size_t block_size;
+  
+  accessor_remote( const accessor_remote & rhs) = default;
+  accessor_remote & operator = ( const accessor_remote & rhs) = default;
+  accessor_remote( ) : block_size(1) {}
+  accessor_remote( const size_t b_ ) : block_size(b_) {}
+
+  constexpr typename offset_policy::pointer
+    offset( pointer p , ptrdiff_t i ) const noexcept
+    {        
+	   Kokkos::Experimental::print_pointer(i, p, "remote offset");
+       return (typename offset_policy::pointer)(mw_ptr1to0(&p[i]));
+	}
+
+  constexpr reference access( pointer p , ptrdiff_t i ) const noexcept
+    {        
+	   Kokkos::Experimental::print_pointer(i, p, "remote accessor before");
+       element_type * pRef = static_cast<pointer>(mw_ptr1to0(&p[i]));
+       Kokkos::Experimental::print_pointer(i, pRef, "remote accessor after");
+       return *(pRef);
 	}
 
   constexpr ElementType* decay( pointer p ) const noexcept
@@ -775,7 +815,7 @@ struct mdspan_accessor< traits, typename std::enable_if< std::is_same< typename 
 template< class traits >
 struct mdspan_accessor< traits, typename std::enable_if< std::is_same< typename traits::memory_space,Kokkos::HostSpace >::value &&
                                                          std::is_same< typename traits::memory_traits,Kokkos::MemoryTraits<Kokkos::ForceRemote> >::value >::type > {
-	typedef accessor_basic< typename traits::value_type > md_accessor;
+	typedef accessor_remote< typename traits::value_type > md_accessor;
 };
 
 

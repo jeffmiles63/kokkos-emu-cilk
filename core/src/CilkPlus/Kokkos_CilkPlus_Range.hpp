@@ -9,7 +9,7 @@
 #include <cilk/cilk.h>
 #include <memoryweb/memory.h>
 
-#define KOKKOS_CILK_USE_PARALLEL_FOR
+//#define KOKKOS_CILK_USE_PARALLEL_FOR
 #define MAX_THREAD_COUNT 64
 /*--------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------*/

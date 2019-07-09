@@ -42,5 +42,5 @@
 */
 
 #include <cilkplus/TestCilkPlus_Category.hpp>
-#include <SimpleViewTest.hpp>
+//#include <SimpleViewTest.hpp>
 #include <TestViewAccess.hpp>
