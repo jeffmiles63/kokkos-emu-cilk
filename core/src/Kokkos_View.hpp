@@ -637,15 +637,15 @@ public:
   constexpr typename offset_policy::pointer
     offset( pointer p , ptrdiff_t i ) const noexcept
     {        
-	   Kokkos::Experimental::print_pointer(i, p, "remote offset");
+	   //Kokkos::Experimental::print_pointer(i, p, "remote offset");
        return (typename offset_policy::pointer)(mw_ptr1to0(&p[i]));
 	}
 
   constexpr reference access( pointer p , ptrdiff_t i ) const noexcept
     {        
-	   Kokkos::Experimental::print_pointer(i, p, "remote accessor before");
+	   //Kokkos::Experimental::print_pointer(i, p, "remote accessor before");
        element_type * pRef = static_cast<pointer>(mw_ptr1to0(&p[i]));
-       Kokkos::Experimental::print_pointer(i, pRef, "remote accessor after");
+       //Kokkos::Experimental::print_pointer(i, pRef, "remote accessor after");
        return *(pRef);
 	}
 

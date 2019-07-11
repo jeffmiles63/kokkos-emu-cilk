@@ -16,9 +16,9 @@ namespace test {
 
 template< class Scalar, class ExecSpace >
 void TestViewAccess( int N ) {
-   starttiming();
+   //starttiming();
    Kokkos::Experimental::initialize_memory_space();
-/*
+
    Kokkos::View< Scalar*, Kokkos::HostSpace > hs_view( "host", N );
    printf ("host view size is %ld \n", (unsigned long)sizeof(hs_view));
    fflush(stdout);
@@ -41,9 +41,8 @@ void TestViewAccess( int N ) {
    for (int i = 0; i < N; i++) {
       ASSERT_EQ( cp_view(i), i*3 );
    }
-   */
+      
    
-   /*
    Scalar total = 0;
    Kokkos::parallel_reduce (N, KOKKOS_LAMBDA (int i, Scalar& update) {
 	  //printf("[%d] inside reduce functor %d\n", NODE_ID(), i);
@@ -55,7 +54,7 @@ void TestViewAccess( int N ) {
       //printf("[%d] finished updating %d\n", NODE_ID(), i);
 	  //fflush(stdout);	        
    }, total );
-    */
+    
 
    long * refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
 /*   for (int i = 0; i < Kokkos::Experimental::EmuReplicatedSpace::memory_zones(); i++) {
@@ -76,8 +75,8 @@ void TestViewAccess( int N ) {
    }
    printf("local memory view test complete\n");
 */
-/*
 
+/*
    {
       Kokkos::View< Scalar*, Kokkos::Experimental::EmuReplicatedSpace > replicated_space_view( "replicated", N );   
       printf ("replicated view size is %ld \n", (unsigned long)sizeof(replicated_space_view));
@@ -90,7 +89,7 @@ void TestViewAccess( int N ) {
    }
  */
    
-   /*
+   
    Kokkos::fence();
    {
       Kokkos::View< Scalar*, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::ForceRemote> > global_space_view( "global", N );
@@ -106,7 +105,7 @@ void TestViewAccess( int N ) {
          global_space_view(i) = (Scalar)i;
       });
 //      }
-   }*/
+   }
    //Kokkos::fence();
    printf("Testing access to strided space view\n");
    fflush(stdout);
