@@ -184,18 +184,22 @@ template< class T >
 inline 
 T local_atomic_add ( volatile T * const dest, const T val )
 {
+   //printf("atomic add: %08x \n", dest );
+   //fflush(stdout);
    T rVal = *dest;
-   for (; ; ) {
-        //printf("atomic_add: %ld, %ld \n",*dest, val);
-        //fflush(stdout);
+   bool bWaiting = true;
+   while (bWaiting) {
      if (Impl::lock_addr((unsigned long)dest)) {
         rVal = *dest;
+        ENTER_CRITICAL_SECTION();
         T new_value = rVal + val;
         *dest = new_value;
+        EXIT_CRITICAL_SECTION();
         Impl::unlock_addr((unsigned long)dest);
-        break;
-     }   
-     RESCHEDULE();  
+        bWaiting = false;
+     } else {
+        Kokkos::Impl::emu_sleep(10); 
+     }
    }   
    //printf("<-- add %d \n", rVal);
    return rVal;

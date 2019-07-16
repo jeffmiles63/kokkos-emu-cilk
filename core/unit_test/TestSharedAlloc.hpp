@@ -83,9 +83,9 @@ void test_shared_alloc()
   static_assert( sizeof( Tracker ) == sizeof( int* ), "SharedAllocationTracker has wrong size!" );
   
   Kokkos::Experimental::initialize_memory_space();
-//  MemorySpace s;
+  MemorySpace s;
 
-  const size_t N = 64;  
+  const size_t N = 128;  
 
   RecordMemS * rarray[ N ];
   Header     * harray[ N ];
@@ -98,12 +98,18 @@ void test_shared_alloc()
   {
     // Since always executed on host space, leave [=]
     Kokkos::parallel_for( range, [=] ( size_t i ) {
+		
+	  long test_count = 0;
+	  const int old_count_1 = Kokkos::atomic_fetch_add( & test_count , 1 );
+      const int old_count_2 = Kokkos::atomic_fetch_sub( & test_count , 1 );
+      //printf("[%d] c1 = %d, c2 = %d \n", i, old_count_1, old_count_2);
+      
       const size_t size = 8;
       char name[64];
       sprintf( name, "test_%.2d", int( i ) );
-      printf("A:[%d] allocating record: %d \n", i, (int)size * ( i + 1 ));
-      r[i] = RecordMemS::allocate( name, size * ( i + 1 ) );
-//      r[i] = RecordMemS::allocate( s, name, size * ( i + 1 ) );
+//      printf("A:[%d] allocating record: %d \n", i, (int)size * ( i + 1 ));
+//      r[i] = RecordMemS::allocate( name, size * ( i + 1 ) );
+      r[i] = RecordMemS::allocate( s, name, size * ( i + 1 ) );
 
 //      printf("A:[%d] get header: %08x \n", i, (unsigned long)r[i]);
 //      fflush(stdout);
@@ -117,6 +123,8 @@ void test_shared_alloc()
       long* pd = (long*)r[i]->data();
       *pd = i * 2;
 
+     // printf("increment record counter: %d, %d \n", i, r[i]->use_count());
+      //fflush(stdout);
       ASSERT_EQ( r[i]->use_count(), ( i / 10 ) + 1 );
       ASSERT_EQ( r[i], RecordMemS::get_record( r[i]->data() ) );
     });
@@ -125,10 +133,11 @@ void test_shared_alloc()
 
     for (int i = 0; i < N; i++) {
        std::string value = r[i]->get_label();
-       printf("record [%d]: %s\n", i, value.c_str());
+      // printf("record [%d]: %s\n", i, value.c_str());
+      // fflush(stdout);
     }
 
-
+    ExecutionSpace::fence();
 #ifdef KOKKOS_DEBUG
     // Sanity check for the whole set of allocation records to which this record belongs.
     RecordBase::is_sane( r[0] );
@@ -137,8 +146,8 @@ void test_shared_alloc()
 
     Kokkos::parallel_for( range, [=] ( size_t i ) {
       while ( 0 != ( r[i] = static_cast< RecordMemS * >( RecordBase::decrement( r[i] ) ) ) ) {
-//        printf("still waiting: %d \n", r[i]->use_count());
-//        fflush(stdout);
+      //  printf("still waiting: %d \n", r[i]->use_count());
+       // fflush(stdout);
 #ifdef KOKKOS_DEBUG
         if ( r[i]->use_count() == 1 ) RecordBase::is_sane( r[i] );
 #endif
@@ -171,11 +180,16 @@ void test_shared_alloc()
       ASSERT_EQ( r[i], RecordMemS::get_record( r[i]->data() ) );
     });
 
+#ifdef KOKKOS_DEBUG
     RecordBase::is_sane( r[0] );
+#endif
 
     Kokkos::parallel_for( range, [=] ( size_t i ) {
       while ( 0 != ( r[i] = static_cast< RecordMemS * >( RecordBase::decrement( r[i] ) ) ) ) {
+		//printf("decrement record counter: %d, %d \n", i, r[i]->use_count());
+#ifdef KOKKOS_DEBUG		
         if ( r[i]->use_count() == 1 ) RecordBase::is_sane( r[i] );
+#endif
       }
     });
 
@@ -253,7 +267,7 @@ void test_repl_shared_alloc()
   ExecutionSpace::fence();
 //  MemorySpace s;
 
-  const size_t N = 1;
+  const size_t N = 512;
   RecordMemS * rarray[ N ];
   Header     * harray[ N ];
 
@@ -269,12 +283,12 @@ void test_repl_shared_alloc()
       const size_t size = 8;
       char name[64];
       sprintf( name, "test_%.2d", int( i ) );
-      printf("A:[%d] allocating record: %d \n", i, (int)size * ( i + 1 ));
+//      printf("A:[%d] allocating record: %d \n", i, (int)size * ( i + 1 ));
       r[i] = RecordMemS::allocate( name, size * ( i + 1 ) );
 
    FENCE();
-   printf("alloc record created %d \n", i);
-   fflush(stdout);  
+//   printf("alloc record created %d \n", i);
+//   fflush(stdout);  
 
       Tracker track;
       track.assign_allocated_record_to_uninitialized( r[i] );
@@ -287,8 +301,8 @@ void test_repl_shared_alloc()
          MIGRATE((void*)&pRef[j]);
          std::string value = pr->get_label();
          long cnt = pr->use_count();
-         printf("record [%d]: %s, count = %d\n", j, value.c_str(), cnt);
-         fflush(stdout);
+       //  printf("record [%d]: %s, count = %d\n", j, value.c_str(), cnt);
+        // fflush(stdout);
       }
 
 //      r[i] = RecordMemS::allocate( s, name, size * ( i + 1 ) );
@@ -307,8 +321,8 @@ void test_repl_shared_alloc()
       ASSERT_EQ( r[i]->use_count(), ( i / 10 ) + 1 );
       ASSERT_EQ( r[i], RecordMemS::get_record( r[i]->data() ) );*/
 //    });
-       printf("about to free tracker\n");
-       fflush(stdout);
+      // printf("about to free tracker\n");
+      // fflush(stdout);
     }
 /*
     ExecutionSpace::fence();
@@ -328,8 +342,10 @@ void test_repl_shared_alloc()
 */
 /*
     // Sanity check for the whole set of allocation records to which this record belongs.
+#ifdef KOKKOS_DEBUG 
     RecordBase::is_sane( r[0] );
     // RecordMemS::print_records( std::cout, s, true );
+#endif
 
     Kokkos::parallel_for( range, [=] ( size_t i ) {
       while ( 0 != ( r[i] = static_cast< RecordMemS * >( RecordBase::decrement( r[i] ) ) ) ) {

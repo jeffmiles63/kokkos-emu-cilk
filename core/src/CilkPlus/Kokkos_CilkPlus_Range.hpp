@@ -34,27 +34,34 @@ private:
   template< class TagType >
   typename std::enable_if< std::is_same< TagType , void >::value >::type 
   inner_exec(int inLen_, int sc_, int iLoop) const {	  
-	  for (int s = 0; s < sc_; s++) {		  
-		  _Cilk_spawn inner_exec<TagType>(inLen_, 0, iLoop * sc_ + s );
-      }
-      int offset = iLoop * inLen_;
-      for ( int j = 0; j < inLen_; j++) {
-		  int ndx = offset + j;		  
-		  m_functor( ndx );
+	  if ( sc_ > 0 ) {
+	     for (int s = 0; s < sc_; s++) {		  
+		     _Cilk_spawn inner_exec<TagType>(inLen_, 0, iLoop * sc_ + s );
+         }
+      } else {
+         int offset = iLoop * inLen_;
+         for ( int j = 0; j < inLen_; j++) {
+		     int ndx = offset + j;		  
+		     m_functor( ndx );
+         }
       }
   }
 
   template< class TagType >
   typename std::enable_if< ! std::is_same< TagType , void >::value >::type
   inner_exec(const TagType t, int inLen_, int sc_, int iLoop) const {	  
-	  for (int s = 0; s < sc_; s++) {		  
-		  _Cilk_spawn inner_exec<TagType>(t, inLen_, 0, iLoop * sc_ + s );
-      }
-      int offset = iLoop * inLen_;
-      for ( int j = 0; j < inLen_; j++) {
-		  int ndx = offset + j;
-		  m_functor( t, ndx );
-      }      
+	  if ( sc_ > 0 ) {
+	     for (int s = 0; s < sc_; s++) {	
+			 //printf("spawn inner: s = %d , inlen = %d, len = %d \n", (const int)s, (const int)inLen_, (const int)iLoop * sc_ + s);	  
+		     _Cilk_spawn inner_exec<TagType>(t, inLen_, 0, iLoop * sc_ + s );
+         }
+      } else {
+         int offset = iLoop * inLen_;
+         for ( int j = 0; j < inLen_; j++) {
+		     int ndx = offset + j;
+		     m_functor( t, ndx );
+         }      
+	  }
   }  
 
   template< class TagType >
@@ -81,10 +88,12 @@ private:
       long * refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
       int sc_count = par_loop / Kokkos::Experimental::EmuReplicatedSpace::memory_zones();
       //printf(" tree spawn parallel for: b= %d, e = %d, l = %d, par = %d, sc = %d, int = %d \n", b, e, len, par_loop, sc_count, int_loop);
+      //fflush(stdout);
       for (typename Policy::member_type i = 0 ; i < par_loop / sc_count ; ++i ) {  // This should be the number of nodes...
-           //printf(" parallel for spawn: i = %d \n", (const int)i);
-           _Cilk_migrate_hint(&refPtr[i]);
-           _Cilk_spawn inner_exec<TagType>(int_loop, sc_count, i);
+           //printf(" parallel for spawn: i = %d , %08x \n", (const int)i, &refPtr[i]);
+           //fflush(stdout);
+           //_Cilk_migrate_hint(&refPtr[i]);
+           _Cilk_spawn inner_exec<TagType>(int_loop, sc_count, i);          
        }
 #endif
    }    

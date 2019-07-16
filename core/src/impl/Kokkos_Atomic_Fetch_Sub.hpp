@@ -53,6 +53,8 @@
 #include<Cuda/Kokkos_Cuda_Version_9_8_Compatibility.hpp>
 #endif
 
+
+
 namespace Kokkos {
 
 //----------------------------------------------------------------------------
@@ -176,20 +178,23 @@ template< class T >
 inline 
 T local_atomic_sub ( volatile T * const dest, const T val )
 {
-   T rVal = *dest;
-   for (; ; ) {
+   //printf("atomic sub: %08x \n", dest );
+   //fflush(stdout);
+	
+   T rVal = *dest;   
+   bool bWaiting = true;
+   while (bWaiting) {
      if (Impl::lock_addr((unsigned long)dest)) {
-        MIGRATE((void *)dest);
-        ENTER_CRITICAL_SECTION();        
         rVal = *dest;
+        ENTER_CRITICAL_SECTION();
         T new_value = rVal - val;
-        *dest = new_value;
+        *dest = new_value;        
         EXIT_CRITICAL_SECTION();
         Impl::unlock_addr((unsigned long)dest);
-        break;
-     }
-     MIGRATE((void *)dest);
-     RESCHEDULE();
+        bWaiting = false;
+     } else {     
+        Kokkos::Impl::emu_sleep(10);
+	 }
    }
    return rVal;
 }

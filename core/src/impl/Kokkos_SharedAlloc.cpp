@@ -43,67 +43,174 @@
 #define KOKKOS_LOCK_FIRST
 #include <Kokkos_Core.hpp>
 
+#if defined(KOKKOS_ENABLE_EMU)
+   #include <memoryweb/memoryweb.h>
+   #include <memoryweb/repl.h>
+   #include <memoryweb/pmanip.h>   
+#endif
+
 namespace Kokkos {
 namespace Impl {
+	
+#define LIST_LOCK(A) ((long*)list_lock)[A]
+#define CUR_LOCK_PTR(A) ((long*)cur_lock_ptr)[A]
+#define LIST_HEAD(A) ((long*)list_head)[A]
+#define LOCK_LIST(A) ((long*)lockList)[A]
+	
+void emu_sleep( unsigned long ms ) {
+	RESCHEDULE();
+}
 
-AddrLock * getAddrLock(unsigned long addr) {
-   unsigned long lAddr = (unsigned long)mw_ptr1to0(addr);
-   AddrLock * pReturn = NULL;   
-   //printf("obtaining address lock %08x...: %d \n", lockList, NODE_ID());
-   //fflush(stdout);
-   if (ATOMIC_CAS(&list_mutex, 1L, 0L) == 0L) {	  
-	  //printf("mutex locked...\n");
-	  //fflush(stdout);
-      AddrLock * pWork = (AddrLock*)mw_ptr1to0(lockList);
-      while (pWork != NULL) {
-         //printf("inner lock loop lock %08x... %d \n", pWork, NODE_ID());
-         //fflush(stdout);
-		  
-         if (pWork->id == lAddr) {
-			 //printf("addr lock acquired \n");
-             break;
-         }
-         pWork = pWork->pNext;
-      }
-      if (pWork == NULL) {
-		 //printf("creating new addr lock \n");
-         pWork = mw_ptr1to0( new AddrLock(lAddr) );
-         pWork->pNext = lockList;
-         lockList = pWork;
-      }
-      pReturn = pWork;
-      ATOMIC_SWAP( &list_mutex, 0L);
-      //printf("mutex unlocked...\n");
-      //fflush(stdout);
+replicated long list_lock;         // mutex / lock for list
+replicated long cur_lock_ptr;      // index of next available lock in lockList
+replicated long list_head;         // pointer to first lock in linked list
+replicated long lockList;          // strided storage location for locks pool
+
+// initialize lock vars on particular node
+void init_locks( int i ) {
+	LIST_LOCK(i) = 0;
+	CUR_LOCK_PTR(i) = KOKKOS_MEMORY_LOCK_LEN;
+	LIST_HEAD(i) = NULL;	
+			
+	for ( int r = 0; r < KOKKOS_MEMORY_LOCK_LEN; r++ ) {
+       ((AddrLock*)&LOCK_LIST(i))[r].id = 0;
+       ((AddrLock*)&LOCK_LIST(i))[r].pNext = NULL;
+    }
+}
+
+/*
+ * Single lock variable per nodelet 
+ *   lock list is linked list where the head is striped memory, and the
+ *   nodes are local to the striped head.
+ * 
+ */
+void initialize_memory_locks() {
+	int nCnt = NODELETS();
+	long * ll_ = mw_malloc1dlong(nCnt);
+	long * clp_ = mw_malloc1dlong(nCnt);
+	long * lh_ = mw_malloc1dlong(nCnt);
+	long ** lol_ = (long**)mw_malloc2d(nCnt, KOKKOS_MEMORY_LOCK_LEN * sizeof(AddrLock));
+	
+	mw_replicated_init( &list_lock, (unsigned long)ll_ );
+	mw_replicated_init( &cur_lock_ptr, (unsigned long)clp_ );
+	mw_replicated_init( &list_head, (unsigned long)lh_ );
+	mw_replicated_init( &lockList, (unsigned long)lol_ );
+		
+	for ( int i = 0; i < nCnt; i++) {
+		cilk_spawn_at(&ll_[i]) init_locks( i );
+    }
+    cilk_sync;
+}
+
+// Lock mutex for this node
+bool get_lock(int i, unsigned long addr) {
+   if (ATOMIC_CAS(&LIST_LOCK(i), 1L, 0L) == 0L) { 
+      return true;
    }
-   //printf("returning address lock %08x... \n", pReturn);
-   //fflush(stdout);
-   return pReturn;
+   return false;
 }
 
-bool lock_addr( unsigned long addr ) {
-  AddrLock * pWork = getAddrLock( addr );
-  if ( pWork != NULL ) {
-//    printf("obtaining lock %08x: %ld ==> ", addr, pWork->lock);
-//    fflush(stdout);
-    long nReturn = ATOMIC_CAS(&(pWork->lock), 1L, 0L);
-//    printf("%ld \n ", nReturn);
-//    fflush(stdout);
-    return ( nReturn == 0L );
+// free mutext for this node
+bool free_lock(int i) {   
+   long prev = ATOMIC_SWAP(&LIST_LOCK(i), 0); 
+   
+   return true;
+}
+
+// if its in the list, it's locked...
+bool lock_addr( unsigned long ad ) {
+  unsigned long addr = ad;
+  int nNode = mw_ptrtonodelet( addr );  
+  bool bFound = true;
+  if ( get_lock(nNode, addr) ) {	 
+	 bFound = false;
+	 
+	 AddrLock * pWork = (AddrLock*)LIST_HEAD(nNode);
+	 while (pWork != NULL) {
+		 if (pWork->id == addr) {
+			 bFound = true;
+			 break;
+		 }
+		 pWork = pWork->pNext;
+	 }
+	 
+	 if (!bFound) {
+		if (CUR_LOCK_PTR(nNode) >= 0) {
+			CUR_LOCK_PTR(nNode)--;
+            AddrLock * ptr = &(((AddrLock*)&LOCK_LIST(nNode))[CUR_LOCK_PTR(nNode)]);
+            ptr->id = addr;
+            if (LIST_HEAD(nNode) != NULL) {
+		       ptr->pNext = (AddrLock*)LIST_HEAD(nNode);
+		    } 
+		    LIST_HEAD(nNode) = (unsigned long)ptr;
+		 } else {
+			bFound = true; // set this to true...if we can't find an open slot, we want to return false;
+            for (int r = 0; r < KOKKOS_MEMORY_LOCK_LEN; r++) {
+				if ( ((AddrLock*)&LOCK_LIST(nNode))[r].id == NULL ) {
+                   AddrLock * ptr = &(((AddrLock*)&LOCK_LIST(nNode))[r]);
+                   ptr->id = addr;
+		           if (LIST_HEAD(nNode) != NULL) {
+		              ptr->pNext = (AddrLock*)LIST_HEAD(nNode);
+		           } 
+		           LIST_HEAD(nNode) = (unsigned long)ptr;		           
+		           bFound = false;
+		           break;		
+				}
+			}
+		 }		 
+	 }
+     free_lock(nNode);
+     fflush(stdout);
   }
-  else 
-    return false;
+  return !bFound;
 }
 
-void unlock_addr( unsigned long addr ) {
-  while (true) {
-     AddrLock * pWork = getAddrLock( addr );
-     if ( pWork != NULL ) {
-//       printf("releasing lock %08x: %ld \n", addr, pWork->lock);
-//       fflush(stdout);
-       ATOMIC_SWAP(&(pWork->lock), 0L);
-       break;
-     }     
+void free_node( int i, AddrLock * pWork) {
+  
+  if ( CUR_LOCK_PTR(i) >= 0 ) {
+	  if ( ((AddrLock*)&LOCK_LIST(i))[CUR_LOCK_PTR(i)].id == pWork->id ) {
+		  CUR_LOCK_PTR(i)++;
+		  while ( CUR_LOCK_PTR(i) < KOKKOS_MEMORY_LOCK_LEN && 
+		           ((AddrLock*)&LOCK_LIST(i))[CUR_LOCK_PTR(i)].id == 0 ) {
+			  //printf("purging record from unused list...%d\n", CUR_LOCK_PTR(i));
+			  CUR_LOCK_PTR(i)++;
+		  }
+	  }
+  }
+  pWork->id = 0;
+  pWork->pNext = NULL;  
+}
+
+// take it out of the list to free the lock...
+void unlock_addr( unsigned long ad ) {
+  //unsigned long addr = mw_ptr1to0(ad);
+  unsigned long addr = ad;
+  int nNode = mw_ptrtonodelet( addr );  
+  bool bLock = get_lock(nNode, addr);  // this has to get a lock...we will wait.
+  while( !bLock  )  {
+	  emu_sleep(10);
+	  bLock = get_lock(nNode, addr);
+  }
+  if ( bLock ) {	 
+	 bool bFound = false;
+	 AddrLock * pWork = (AddrLock*)LIST_HEAD(nNode);
+	 if (pWork != NULL && pWork->id == addr) {
+		 LIST_HEAD(nNode) = (unsigned long)pWork->pNext;
+		 free_node(nNode, pWork);
+		 bFound = true;
+	 } else {
+	   while (pWork != NULL && pWork->pNext != NULL) {
+		 if (pWork->pNext->id == addr) {
+			 AddrLock * pTemp = pWork->pNext;
+			 pWork->pNext = pTemp->pNext;
+			 free_node(nNode, pTemp);
+			 bFound = true;
+			 break;
+		 }
+		 pWork = pWork->pNext;
+	   }
+	 }
+     free_lock(nNode);
   }
 }
 

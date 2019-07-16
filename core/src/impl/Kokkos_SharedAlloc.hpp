@@ -48,7 +48,7 @@
 #include <string>
 
 #if defined(KOKKOS_ENABLE_EMU)
-   #define KOKKOS_THREAD_PREFIX
+   #define KOKKOS_THREAD_PREFIX 
 #else
    #define KOKKOS_THREAD_PREFIX __thread
 #endif
@@ -61,22 +61,18 @@ namespace Impl {
 #else
    #define KOKKOS_LOCK_PREFIX extern
 #endif
+
+#define KOKKOS_MEMORY_LOCK_LEN 1024
+
 struct AddrLock {
-   long lock;
    unsigned long id;
    AddrLock * pNext;
-   AddrLock() : lock(0), id(0) {
-      pNext = NULL;
-   }
-   AddrLock(unsigned long id_) : lock(0), id(id_) {
-      pNext = NULL;
-   }
 };
 
-KOKKOS_LOCK_PREFIX long list_mutex;
-KOKKOS_LOCK_PREFIX AddrLock * lockList;
-bool lock_addr( unsigned long addr);
-void unlock_addr( unsigned long addr);
+void emu_sleep( unsigned long ms );
+void initialize_memory_locks();
+bool lock_addr( unsigned long ad );
+void unlock_addr( unsigned long ad );
 
 template< class MemorySpace = void , class DestroyFunctor = void >
 class SharedAllocationRecord ;

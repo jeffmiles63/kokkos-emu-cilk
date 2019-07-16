@@ -201,18 +201,19 @@ template<class T>
 inline 
 T local_atomic_exchange( T* dest, const T val ){
    T orig = *dest;
+   int nCnt = 0;
    for (; ; ) {
-     if (Impl::lock_addr((unsigned long)dest)) {
-        MIGRATE((void *)dest);
-        ENTER_CRITICAL_SECTION();        
+     if (Impl::lock_addr((unsigned long)dest)) {      
+        //DISABLE_INTERRUPTS();        
         orig = *dest;
-        *dest = val;
-        EXIT_CRITICAL_SECTION();
+        *dest = val;        
         Impl::unlock_addr((unsigned long)dest);
+        //ENABLE_INTERRUPTS();
         break;
-     }
-     MIGRATE((void *)dest);
-     RESCHEDULE();
+     }     
+     nCnt++;
+     if (nCnt %10000) printf("thread waiting for atomic exchange ...\n");     
+     Kokkos::Impl::emu_sleep((unsigned long)dest);
    }   
    return orig;
 }

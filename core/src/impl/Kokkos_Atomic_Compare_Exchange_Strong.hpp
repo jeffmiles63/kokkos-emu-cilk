@@ -146,21 +146,21 @@ inline
 int atomic_compare_exchange( volatile int * const dest, const int compare, const int val)
 { 
   int return_val;
-  
+  int nCnt = 0;
   while (true) {
      if (Impl::lock_addr((unsigned long)dest)) {
-        MIGRATE((void *)dest);
-        ENTER_CRITICAL_SECTION();
+        //DISABLE_INTERRUPTS();
         return_val = *dest;
         if( return_val == compare ) {
            *dest = val;
-        }
-        EXIT_CRITICAL_SECTION();
+        }        
         Impl::unlock_addr((unsigned long)dest);
+        //ENABLE_INTERRUPTS();
         break;
      }
-     MIGRATE((void *)dest);
-     RESCHEDULE();
+     nCnt++;
+     if (nCnt %10000) printf("thread waiting for atomic compare exchange ...\n");
+     Kokkos::Impl::emu_sleep((unsigned long)dest);
   }
   
   
@@ -172,20 +172,21 @@ unsigned int atomic_compare_exchange( volatile unsigned int * const dest, const 
 { 
   unsigned int return_val;
 
+  int nCnt = 0;
   while (true) {
      if (Impl::lock_addr((unsigned long)dest)) {
-        MIGRATE((void *)dest);
-        ENTER_CRITICAL_SECTION();
+        //DISABLE_INTERRUPTS();
         return_val = *dest;
         if( return_val == compare ) {
            *dest = val;
-        }
-        EXIT_CRITICAL_SECTION();
+        }        
         Impl::unlock_addr((unsigned long)dest);
+        //ENABLE_INTERRUPTS();
         break;
      }
-     MIGRATE((void *)dest);
-     RESCHEDULE();
+     nCnt++;
+     if (nCnt %10000) printf("thread waiting for atomic compare exhange II...\n");
+     Kokkos::Impl::emu_sleep((unsigned long)dest);
   }
   
   return return_val;
@@ -197,20 +198,21 @@ unsigned long long int atomic_compare_exchange( volatile unsigned long long int 
                                                 const unsigned long long int val )
 { 
   unsigned long long int return_val;
+  int nCnt = 0;
   while (true) {
      if (Impl::lock_addr((unsigned long)dest)) {
-        MIGRATE((void *)dest);
-        ENTER_CRITICAL_SECTION();
+        //DISABLE_INTERRUPTS();
         return_val = *dest;
         if( return_val == compare ) {
            *dest = val;
-        }
-        EXIT_CRITICAL_SECTION();
+        }        
         Impl::unlock_addr((unsigned long)dest);
+        //ENABLE_INTERRUPTS();
         break;
      }
-     MIGRATE((void *)dest);
-     RESCHEDULE();
+     nCnt++;
+     if (nCnt %10000) printf("thread waiting for atomic compare exchange III...\n");
+     Kokkos::Impl::emu_sleep((unsigned long)dest);
   }
   return return_val;
 }
@@ -245,19 +247,20 @@ T atomic_compare_exchange( volatile T * const dest , const T & compare ,
 {
   T return_val;
 
+  int nCnt = 0;
   while (true) {
      if (Impl::lock_addr((unsigned long)dest)) {
-        MIGRATE((void *)dest);
-        ENTER_CRITICAL_SECTION();
+        //DISABLE_INTERRUPTS();
         return_val = *dest;
         if( return_val == compare ) {
            *dest = val;
-        }
-        EXIT_CRITICAL_SECTION();
+        }        
         Impl::unlock_addr((unsigned long)dest);
+        //ENABLE_INTERRUPTS();
         break;
      }
-     MIGRATE((void *)dest);
+     nCnt++;
+     if (nCnt %10000) printf("thread waiting for atomic compare exchange IV ...\n");
      RESCHEDULE();
   }
 

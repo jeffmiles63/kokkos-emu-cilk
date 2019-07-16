@@ -174,8 +174,7 @@ setenv("MEMKIND_HBW_NODES", "1", 0);
 #endif
 #endif
 
-list_mutex = 0;
-lockList = new AddrLock();
+initialize_memory_locks();
 
 #if defined( KOKKOS_ENABLE_CILKPLUS)
   Kokkos::Experimental::CilkPlus::initialize();
