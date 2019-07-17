@@ -41,8 +41,9 @@ private:
       } else {
          int offset = iLoop * inLen_;
          for ( int j = 0; j < inLen_; j++) {
-		     int ndx = offset + j;		  
-		     m_functor( ndx );
+		     int ndx = offset + j;
+		     if ( ndx < m_policy.end() )  
+		        m_functor( ndx );
          }
       }
   }
@@ -59,7 +60,8 @@ private:
          int offset = iLoop * inLen_;
          for ( int j = 0; j < inLen_; j++) {
 		     int ndx = offset + j;
-		     m_functor( t, ndx );
+		     if ( ndx < m_policy.end() )
+		        m_functor( t, ndx );
          }      
 	  }
   }  
@@ -86,9 +88,10 @@ private:
        }
 #else
       long * refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
-      int sc_count = par_loop / Kokkos::Experimental::EmuReplicatedSpace::memory_zones();
-      //printf(" tree spawn parallel for: b= %d, e = %d, l = %d, par = %d, sc = %d, int = %d \n", b, e, len, par_loop, sc_count, int_loop);
-      //fflush(stdout);
+      int mz = Kokkos::Experimental::EmuReplicatedSpace::memory_zones();
+      int sc_count = par_loop / mz + ( ( (par_loop % mz) == 0) ? 0 : 1 );
+      printf(" tree spawn parallel for: b= %d, e = %d, l = %d, par = %d, sc = %d, int = %d \n", b, e, len, par_loop, sc_count, int_loop);
+      fflush(stdout);
       for (typename Policy::member_type i = 0 ; i < par_loop / sc_count ; ++i ) {  // This should be the number of nodes...
            //printf(" parallel for spawn: i = %d , %08x \n", (const int)i, &refPtr[i]);
            //fflush(stdout);
