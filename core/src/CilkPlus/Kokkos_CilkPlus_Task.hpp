@@ -54,6 +54,66 @@ namespace Kokkos {
 	
 namespace Impl {
 
+/**\brief  Impl::TaskExec<CilkPlus> is the TaskScheduler<CilkPlus>::member_type
+ *         passed to tasks running in a CilkPlus space.
+ *
+ *    team member
+ *    team size
+ *    league rank
+ *    league size
+ *
+ */
+template <class Scheduler>
+class TaskExec<Kokkos::Experimental::CilkPlus, Scheduler> {
+ private:
+  enum { emu_league_size = 8 };
+
+  TaskExec(TaskExec&&)      = delete;
+  TaskExec(TaskExec const&) = delete;
+  TaskExec& operator=(TaskExec&&) = delete;
+  TaskExec& operator=(TaskExec const&) = delete;
+
+  const int m_team_rank;
+  const int m_team_size;  
+  const int m_league_rank;
+  Scheduler m_scheduler;
+  
+ public:
+  
+  KOKKOS_INLINE_FUNCTION
+  TaskExec(Scheduler const& parent_scheduler, int arg_team_rank = 0, 
+           int arg_team_size = 1, int arg_league_rank = 0)
+      : m_team_rank(arg_team_rank),
+        m_team_size(arg_team_size),
+        m_league_rank(arg_league_rank),
+        m_scheduler(parent_scheduler.get_team_scheduler(league_rank())) {}
+
+ public:
+  using thread_team_member = TaskExec;
+
+  int team_rank() const { return m_team_rank; }
+  int team_size() const { return m_team_size; }
+  int league_rank() const { return m_league_rank; }
+  int league_size() const { return emu_league_size; }
+
+  void team_barrier() const {
+    if (1 < m_team_size) {
+      cilk_sync;
+    }
+  }
+
+  template <class ValueType>
+  void team_broadcast(ValueType& val, const int thread_id) const {
+    
+  }
+
+  KOKKOS_INLINE_FUNCTION Scheduler const& scheduler() const noexcept {
+    return m_scheduler;
+  }
+  KOKKOS_INLINE_FUNCTION Scheduler& scheduler() noexcept { return m_scheduler; }
+};
+
+
 /*template <>
 struct TaskQueueSpecialization<
   Kokkos::SimpleTaskScheduler<Kokkos::Experimental::CilkPlus, Impl::SingleTaskQueue<
@@ -71,10 +131,7 @@ public:
 
   using execution_space = Kokkos::Experimental::CilkPlus;
   using scheduler_type = SimpleEmuTaskScheduler<Kokkos::Experimental::CilkPlus>;
-  using member_type = TaskTeamMemberAdapter<
-    Kokkos::Impl::HostThreadTeamMember<execution_space>,
-    scheduler_type
-  >;
+  using member_type     = TaskExec<Kokkos::Experimental::CilkPlus, scheduler_type>;
   using memory_space = Kokkos::Experimental::EmuStridedSpace;
   
   using queue_type = typename scheduler_type::task_queue_type; 
@@ -86,29 +143,33 @@ public:
     
   }
 
-  static void launch_task(RunnableTaskBase<Impl::TaskQueueTraitsLockBased> *  task_ptr, int offset, int i, int n, scheduler_type const& scheduler, long* data_ref) {
+  static void launch_task( void * ptr, int offset, int i, int n, scheduler_type const& scheduler, long* data_ref) {
 	  int ndx = offset + i * layer_width + n;  // i is nodelet, n is layer index
 	  	  
+	  task_base_type * task_ptr = (task_base_type *)ptr;
 	  printf("inside task thread %d, %d : %08x \n", i, n, task_ptr);
-	  auto& queue = scheduler.queue(i);
-      Impl::HostThreadTeamData& self = *Impl::serial_get_thread_team_data();
-      auto team_scheduler = scheduler.get_team_scheduler(ndx);
-      member_type member(scheduler, self);	  
+	  fflush(stdout);
+	  
+
+         	  
+	  auto& queue = scheduler.queue(i);    
+      auto team_scheduler = scheduler.get_team_scheduler(i);
+      member_type member(scheduler, n, layer_width, i);
 	  
 	  if ( task_ptr ) {
-	  
-		  printf("running task %d, %08x\n", ndx, (unsigned long)(task_base_type*)task_ptr);
-		  fflush(stdout);
-		  
-
-		  fflush(stdout);
-		  if (task_ptr) {
-             task_ptr->run(member);
-		  }
+		  		  
+		 printf("task run [%d,%d] -->\n", i, n);
+		 fflush(stdout);
+		 
+         auto current_task = OptionalRef<task_base_type>(*task_ptr);	  
+         current_task->as_runnable_task().run(member);
+         
+		 printf("task complete [%d,%d] -->\n", i, n);
+		 fflush(stdout);
      
           // Respawns are handled in the complete function
           queue.complete(
-             std::move(*task_ptr),
+             (*std::move(current_task)).as_runnable_task(),
              team_scheduler.team_scheduler_info()
           );	  
  	  } else {
@@ -124,11 +185,10 @@ public:
 	  fflush(stdout);
 	  	  	  	  
 	  auto& queue = scheduler.queue(i);
-	  int ndx = offset + i * layer_width;
-      auto team_scheduler = scheduler.get_team_scheduler(ndx);
+      auto team_scheduler = scheduler.get_team_scheduler(i);
       
-      //printf("head [%d] entering queue processing loop \n", i );
-	  //fflush(stdout);      
+      printf("head [%d] entering queue processing loop \n", i );
+	  fflush(stdout);      
            
       int n = 0;
       while ( (!queue.is_done()) && n < layer_width ) {
@@ -137,13 +197,16 @@ public:
 		 //fflush(stdout);
 		 auto current_task = OptionalRef<task_base_type>(nullptr);
          current_task = queue.pop_ready_task(team_scheduler.team_scheduler_info());
+         //printf("[%d] task head returned from pop_ready_task \n", i);
+         //fflush(stdout);
 	  
-	     if ( current_task.get() ) {
+	     if ( current_task.get() != nullptr ) {
 		  	 printf("head [%d] launching task thread %d : %08x \n", i, n, current_task.get());
-		     RunnableTaskBase<Impl::TaskQueueTraitsLockBased> * task_b = static_cast<RunnableTaskBase<Impl::TaskQueueTraitsLockBased> *>(current_task.get());
-             printf("base runnable task %d, %08x\n", ndx, (unsigned long)task_b);
+		  	 fflush(stdout);
+		  	 
+		  	 void* ptr = (void*)current_task.get();
              
-		     cilk_spawn_at(task_b) launch_task( task_b, offset, i, n, scheduler, data_ref );      
+		     cilk_spawn_at(ptr) launch_task( ptr, offset, i, n, scheduler, data_ref ); 
 		     n++;
 
 	      }

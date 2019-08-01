@@ -437,7 +437,7 @@ private:
       /* queue_base = */ queue,
       /* initial_reference_count = */ 2
     );
-    printf("ready to initialize the runnable task \n");
+    printf("ready to initialize the runnable task: %08x \n", &runnable_task);
     fflush(stdout);
 
     if(arg_predecessor_task != nullptr) {
@@ -578,16 +578,16 @@ public:
   SimpleEmuTaskScheduler
   get_team_scheduler(int rank_in_league) const noexcept
   {
-	//printf("get team scheduler: %d \n", rank_in_league);
-	//fflush(stdout);
+	printf("get team scheduler: %d \n", rank_in_league);
+	fflush(stdout);
     KOKKOS_EXPECTS(m_queue_rep != nullptr);
     auto rv = SimpleEmuTaskScheduler{ *this };
-	//printf("team scheduler get queue: %d \n", rank_in_league);
-	//fflush(stdout);
+	printf("team scheduler get queue: %d \n", rank_in_league);
+	fflush(stdout);
     
     task_queue_type* queue = _get_queue(rank_in_league);    
-	//printf("get team scheduler info: %d \n", rank_in_league);
-	//fflush(stdout);
+	printf("get team scheduler info: %d \n", rank_in_league);
+	fflush(stdout);
     
     rv.team_scheduler_info() = queue->initial_team_scheduler_info(rank_in_league);
     return rv;
