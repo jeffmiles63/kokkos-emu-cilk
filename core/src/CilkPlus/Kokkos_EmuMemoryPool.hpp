@@ -44,7 +44,12 @@
 #ifndef KOKKOS_EMU_MEMORYPOOL_HPP
 #define KOKKOS_EMU_MEMORYPOOL_HPP
 
+#include <map>
+
+
+
 namespace Kokkos {
+
 
 template<>
 class MemoryPool<Kokkos::Device<Kokkos::Experimental::CilkPlus, Kokkos::Experimental::EmuStridedSpace> > {
@@ -84,9 +89,7 @@ private:
 
   typedef typename DeviceType::memory_space base_memory_space ;
 
-  enum { accessible =
-           Kokkos::Impl::MemorySpaceAccess< Kokkos::HostSpace 
-                                          , base_memory_space >::accessible };
+  enum { accessible = 1 };
 
   typedef Kokkos::Impl::SharedAllocationTracker Tracker ;
   typedef Kokkos::Impl::SharedAllocationRecord
@@ -100,6 +103,7 @@ private:
   int32_t    m_sb_count ;
   int32_t    m_hint_offset ;   // Offset to K * #block_size array of hints
   int32_t    m_data_offset ;   // Offset to 0th superblock data
+  long *     m_sb_lock_array;
 
 public:
 
@@ -145,6 +149,39 @@ public:
     , m_hint_offset(0)
     , m_data_offset(0)
     {}
+    
+  void initialize_pool_state ( int k, uint32_t * p_state_array, const int32_t number_block_sizes ) {
+      
+      uint32_t * const sb_state_array = p_state_array;
+
+      for ( int32_t i = 0 ; i < m_data_offset ; ++i ) sb_state_array[i] = 0 ;
+
+      // Initial assignment of empty superblocks to block sizes:
+
+      for ( int32_t i = 0 ; i < number_block_sizes ; ++i ) {
+        const uint32_t block_size_lg2  = i + m_min_block_size_lg2 ;
+        const uint32_t block_count_lg2 = m_sb_size_lg2 - block_size_lg2 ;
+        const uint32_t block_state     = block_count_lg2 << state_shift ;
+        const uint32_t hint_begin = m_hint_offset + i * HINT_PER_BLOCK_SIZE ;
+
+        // for block size index 'i':
+        //   sb_id_hint  = sb_state_array[ hint_begin ];
+        //   sb_id_begin = sb_state_array[ hint_begin + 1 ];
+
+        const int32_t jbeg = ( i * m_sb_count ) / number_block_sizes ;
+        const int32_t jend = ( ( i + 1 ) * m_sb_count ) / number_block_sizes ;
+
+        sb_state_array[ hint_begin ] = uint32_t(jbeg);
+        sb_state_array[ hint_begin + 1 ] = uint32_t(jbeg);
+
+        for ( int32_t j = jbeg ; j < jend ; ++j ) {
+          sb_state_array[ j * m_sb_state_size ] = block_state ;
+        }
+      }
+      
+      m_sb_lock_array[k] = 0;
+	  
+  }
 
   /**\brief  Allocate a memory pool from 'memspace'.
    *
@@ -298,53 +335,16 @@ public:
       const size_t alloc_size  = header_size +
                                  ( size_t(m_sb_count) << m_sb_size_lg2 ) * 
                                  Kokkos::Experimental::EmuReplicatedSpace::memory_zones();
-
+      m_sb_lock_array = mw_malloc1dlong(Kokkos::Experimental::EmuReplicatedSpace::memory_zones());
       m_sb_state_array = (uint32_t *) memspace.allocate( alloc_size );
       
-      //printf("strided memory pool allocated: %08x \n", (unsigned long)m_sb_state_array);
+      //printf("%s memory pool allocated: %08x \n", memspace.name(), (unsigned long)m_sb_state_array);
 
-      Kokkos::HostSpace host ;
-
-      uint32_t * const sb_state_array = 
-        accessible ? m_sb_state_array
-                   : (uint32_t *) host.allocate(header_size);
-
-      for ( int32_t i = 0 ; i < m_data_offset ; ++i ) sb_state_array[i] = 0 ;
-
-      // Initial assignment of empty superblocks to block sizes:
-
-      for ( int32_t i = 0 ; i < number_block_sizes ; ++i ) {
-        const uint32_t block_size_lg2  = i + m_min_block_size_lg2 ;
-        const uint32_t block_count_lg2 = m_sb_size_lg2 - block_size_lg2 ;
-        const uint32_t block_state     = block_count_lg2 << state_shift ;
-        const uint32_t hint_begin = m_hint_offset + i * HINT_PER_BLOCK_SIZE ;
-
-        // for block size index 'i':
-        //   sb_id_hint  = sb_state_array[ hint_begin ];
-        //   sb_id_begin = sb_state_array[ hint_begin + 1 ];
-
-        const int32_t jbeg = ( i * m_sb_count ) / number_block_sizes ;
-        const int32_t jend = ( ( i + 1 ) * m_sb_count ) / number_block_sizes ;
-
-        sb_state_array[ hint_begin ] = uint32_t(jbeg);
-        sb_state_array[ hint_begin + 1 ] = uint32_t(jbeg);
-
-        for ( int32_t j = jbeg ; j < jend ; ++j ) {
-          sb_state_array[ j * m_sb_state_size ] = block_state ;
-        }
+      for ( int i = 0; i < NODELETS(); i++) {
+		  uint32_t * p_state_array = (uint32_t*)&(((long**)m_sb_state_array)[i][0]);
+		  cilk_spawn_at(p_state_array) initialize_pool_state(i, p_state_array, number_block_sizes);
       }
-
-      // Write out initialized state:
-
-      if ( ! accessible ) {
-        Kokkos::Impl::DeepCopy< base_memory_space , Kokkos::HostSpace >
-          ( m_sb_state_array , sb_state_array , header_size );
-
-        host.deallocate( sb_state_array, header_size );
-      }
-      else {
-        Kokkos::memory_fence();
-      }
+  	  cilk_sync;  
     }
 
   //--------------------------------------------------------------------------
@@ -361,7 +361,7 @@ private:
 
       return i < m_min_block_size_lg2 ? m_min_block_size_lg2 : i ;
     }
-
+   
 public:
 
   /* Return 0 for invalid block size */
@@ -385,7 +385,8 @@ public:
    */
   KOKKOS_FUNCTION
   void * allocate( size_t alloc_size
-                 , int32_t attempt_limit = 1 ) const noexcept
+                 , int32_t attempt_limit = 1
+                 , int32_t add_info = 0 ) const noexcept
     {
       if ( size_t(1LU << m_max_block_size_lg2) < alloc_size ) {
         Kokkos::abort("Kokkos MemoryPool allocation request exceeded specified maximum allocation size");
@@ -407,16 +408,37 @@ public:
       // Superblock hints for this block size:
       //   hint_sb_id_ptr[0] is the dynamically changing hint
       //   hint_sb_id_ptr[1] is the static start point
-      uint32_t * p_state_array = (uint32_t*)&(((long**)m_sb_state_array)[NODE_ID()][0]);
+//      printf("allocating state array from node %d - %d \n", add_info, block_size_lg2);
+//      fflush(stdout);
       
-      Kokkos::Experimental::print_pointer( NODE_ID(), p_state_array, "pool state array" );
-      printf("pool state array: %08x \n", (unsigned long)p_state_array);
+      // need to lock the address ...
+      bool bWaiting = true;
+      while (bWaiting) {
+		long result = ATOMIC_CAS( &m_sb_lock_array[add_info], 1, 0 );
+		if (result == 0) {
+           bWaiting = false;
+        } else {
+           RESCHEDULE();
+        }
+      }
+      
+      //Kokkos::Experimental::print_pointer( add_info, (void*)m_sb_state_array, "mb state array" );      
+      //Kokkos::Experimental::print_pointer( add_info, (void*)&(((long*)m_sb_state_array)[add_info]), "sb state array" );      
+      //MIGRATE(&(((long*)m_sb_state_array)[add_info]) );
+      
+      uint32_t * p_state_array = (uint32_t*)&(((long**)m_sb_state_array)[add_info][0]);
+     
+      //Kokkos::Experimental::print_pointer( add_info, p_state_array, "pool state array" );
+      //printf("pool state array: %08x \n", (unsigned long)p_state_array);
+      //fflush(stdout);
 
       volatile uint32_t * const hint_sb_id_ptr
         = p_state_array        /* memory pool state array */
         + m_hint_offset        /* offset to hint portion of array */
         + HINT_PER_BLOCK_SIZE  /* number of hints per block size */
           * ( block_size_lg2 - m_min_block_size_lg2 ); /* block size id */
+          
+//      Kokkos::Experimental::print_pointer( add_info, (void*)hint_sb_id_ptr, "hint pointer" );   
 
       const int32_t sb_id_begin = int32_t( hint_sb_id_ptr[1] );
 
@@ -426,11 +448,6 @@ public:
 
       const uint32_t block_id_hint =
         (uint32_t)( Kokkos::Impl::clock_tic()
-#if defined( KOKKOS_ACTIVE_EXECUTION_MEMORY_SPACE_CUDA )
-        // Spread out potentially concurrent access
-        // by threads within a warp or thread block.
-        + ( threadIdx.x + blockDim.x * threadIdx.y )
-#endif
         );
 
       // expected state of superblock for allocation
@@ -452,6 +469,8 @@ public:
           sb_id = hint_sb_id = int32_t( *hint_sb_id_ptr );
 
           sb_state_array = p_state_array + ( sb_id * m_sb_state_size );
+          
+//          Kokkos::Experimental::print_pointer( add_info, (void*)sb_state_array, "sb state array" );
         }
 
         // Require:
@@ -460,6 +479,8 @@ public:
 
         if ( sb_state == ( state_header_mask & *sb_state_array ) ) {
 
+          //printf("claiming super block %08x, %d \n", sb_state_array, *sb_state_array );
+          //fflush(stdout);
           // This superblock state is as expected, for the moment.
           // Attempt to claim a bit.  The attempt updates the state
           // so have already made sure the state header is as expected.
@@ -467,12 +488,14 @@ public:
           const uint32_t count_lg2 = sb_state >> state_shift ;
           const uint32_t mask      = ( 1u << count_lg2 ) - 1 ;
 
+          //printf("acquire bounded: %d \n", add_info);
           const Kokkos::pair<int,int> result =
             CB::acquire_bounded_lg2( sb_state_array
                                    , count_lg2
                                    , block_id_hint & mask
                                    , sb_state
                                    );
+          //printf("acquire bounded result: %d = %d \n", add_info, result.first);
 
           // If result.first < 0 then failed to acquire
           // due to either full or buffer was wrong state.
@@ -489,8 +512,9 @@ public:
               + ( uint64_t(sb_id) << m_sb_size_lg2 ) // superblock memory
               + ( uint64_t(result.first) << size_lg2 ); // block memory
 
-#if 1
-  printf( "  MemoryPool(0x%lx) pointer(0x%lx) allocate(%lu) sb_id(%d) sb_state(0x%x) block_size(%d) block_capacity(%d) block_id(%d) block_claimed(%d)\n"
+#if 0
+  printf( "[%d]  MemoryPool(0x%lx) pointer(0x%lx) allocate(%lu) sb_id(%d) sb_state(0x%x) block_size(%d) block_capacity(%d) block_id(%d) block_claimed(%d)\n"
+        , add_info
         , (uintptr_t)p_state_array
         , (uintptr_t)p
         , alloc_size
@@ -505,6 +529,8 @@ public:
             break ; // Success
           }
         }
+        
+        //printf("Could not find an available block...need new superblock %d \n", add_info);
         //------------------------------------------------------------------
         //  Arrive here if failed to acquire a block.
         //  Must find a new superblock.
@@ -524,6 +550,7 @@ public:
         uint32_t sb_state_large = 0 ;
 
         sb_state_array = p_state_array + sb_id_begin * m_sb_state_size ;
+//        Kokkos::Experimental::print_pointer( add_info, (void*)sb_state_array, "sb state array II" );
 
         for ( int32_t i = 0 , id = sb_id_begin ; i < m_sb_count ; ++i ) {
 
@@ -613,6 +640,7 @@ public:
             const uint32_t state_empty = state_header_mask & *sb_state_array ;
 
             // If this thread claims the empty block then update the hint
+            //printf("update state array: %08x \n", sb_state_array);
             update_hint =
               state_empty ==
                 Kokkos::atomic_compare_exchange
@@ -634,11 +662,13 @@ public:
         }
 
         if ( update_hint ) {
+	      //printf("update hint pointer: %08x \n", hint_sb_id_ptr);
           Kokkos::atomic_compare_exchange
             ( hint_sb_id_ptr , uint32_t(hint_sb_id) , uint32_t(sb_id) );
         }
       } // end allocation attempt loop
       //--------------------------------------------------------------------
+      ATOMIC_SWAP(&m_sb_lock_array[add_info], 0);
 
       return p ;
     }
@@ -656,7 +686,21 @@ public:
     {
       if ( 0 == p ) return ;
 
-      uint32_t * p_state_array = (uint32_t*)&(((long**)m_sb_state_array)[NODE_ID()][0]);
+      size_t add_info = mw_ptrtonodelet(p);
+      //printf("deallocate called on %d \n", (int)add_info);
+      uint32_t * p_state_array = (uint32_t*)&(((long**)m_sb_state_array)[add_info][0]);
+      
+      // need to lock the address ...
+      bool bWaiting = true;
+      while (bWaiting) {
+		long result = ATOMIC_CAS( &m_sb_lock_array[add_info], 1, 0 );
+		if (result == 0) {        
+           bWaiting = false;
+        } else {
+           RESCHEDULE();
+        }
+      }
+            
       // Determine which superblock and block
       const ptrdiff_t d =
         ((char*)p) - ((char*)( p_state_array + m_data_offset ));
@@ -705,7 +749,7 @@ public:
         , bit
         , result );
 #endif
-        }
+        }        
       }
 
       if ( ! ok_contains || ! ok_block_aligned || ! ok_dealloc_once ) {
@@ -719,6 +763,7 @@ public:
 #endif
         Kokkos::abort("Kokkos MemoryPool::deallocate given erroneous pointer");
       }
+      ATOMIC_SWAP(&m_sb_lock_array[add_info], add_info);
     }
   // end deallocate
   //--------------------------------------------------------------------------
@@ -736,21 +781,6 @@ public:
       block_count_capacity = 0 ;
       block_count_used     = 0 ;
 
-      if ( Kokkos::Impl::MemorySpaceAccess
-             < Kokkos::Impl::ActiveExecutionMemorySpace
-             , base_memory_space >::accessible ) {
-       // Can access the state array
-       
-        const uint32_t state =
-          ((uint32_t volatile *)m_sb_state_array)[sb_id*m_sb_state_size];
-
-        const uint32_t block_count_lg2 = state >> state_shift ;
-        const uint32_t block_used      = state & state_used_mask ;
-
-        block_size           = 1LU << ( m_sb_size_lg2 - block_count_lg2 );
-        block_count_capacity = 1LU << block_count_lg2 ;
-        block_count_used     = block_used ;
-      }
     }
 };
 

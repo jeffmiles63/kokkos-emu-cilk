@@ -65,6 +65,8 @@
 #include <typeinfo>
 #include <stdexcept>
 
+#include <Kokkos_EmuSpace.hpp>
+
 
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
@@ -74,7 +76,8 @@ namespace Impl {
 
 template <
   class ExecSpace,
-  class MemorySpace
+  class MemorySpace,
+  class MemoryPool = Kokkos::MemoryPool<Kokkos::Device<ExecSpace, MemorySpace>>
 >
 class TaskQueueMemoryManager
   : public TaskQueueBase
@@ -84,12 +87,14 @@ public:
   using execution_space = ExecSpace;
   using memory_space = MemorySpace;
   using device_type = Kokkos::Device<execution_space, memory_space>;
-  using memory_pool = Kokkos::MemoryPool<device_type>;
+  using memory_pool = MemoryPool;
   using allocation_size_type = size_t;
 
-private:
+protected:
 
   memory_pool m_pool;
+  
+private:
   // TODO @tasking @generalization DSH re-enable this with a flag in the type
   //long m_accum_alloc = 0;
   int m_count_alloc = 0;
@@ -102,13 +107,15 @@ private:
 
   KOKKOS_INLINE_FUNCTION
   _allocation_result
-  _do_pool_allocate(allocation_size_type requested_size) {
+  _do_pool_allocate(allocation_size_type requested_size, size_t add_info) {
     // KOKKOS_EXPECTS(requested_size >= 0); generates a warning when allocation_size_type is unsigned
     if(requested_size == 0 ) {
       return { true, nullptr };
     }
     else {
-      void* data = m_pool.allocate(static_cast<size_t>(requested_size));
+      void* data = m_pool.allocate(static_cast<size_t>(requested_size), 1, add_info);
+      //printf("pool data allocated 0x%lx, %d\n", data, add_info);
+      //fflush(stdout);
 
       //Kokkos::atomic_increment(&m_accum_alloc); // memory_order_relaxed
       Kokkos::atomic_increment(&m_count_alloc); // memory_order_relaxed
@@ -135,7 +142,8 @@ private:
     //  "TaskQueueMemoryManager can't construct object of the requested type from the "
     //  " allocation size and the given arguments"
     //);
-
+    //printf("constructing object from pointer: %08x\n", (unsigned long)allocated);
+    //Kokkos::Experimental::print_pointer( NODE_ID(), allocated, "task object" );
 
     auto rv = new (allocated) T(
       std::forward<Args>(args)...,
@@ -147,7 +155,8 @@ private:
       (intptr_t)(rv) == (intptr_t)(static_cast<PoolAllocatedObjectBase<int32_t>*>(rv))
         && "PoolAllocatedObjectBase must be the first base class of the allocated type"
     );
-
+    //printf("task object constructed\n");
+    //fflush(stdout);
     return rv;
 
   }
@@ -158,13 +167,14 @@ public:
   explicit
   TaskQueueMemoryManager(memory_pool const& pool)
     : m_pool(pool)
-  { }
+  { //printf("task queue memory manager \n"); fflush(stdout);
+  }
 
 
   template <class T, class... Args>
   KOKKOS_FUNCTION
   T*
-  allocate_and_construct(Args&&... args)
+  allocate_and_construct(size_t add_info,Args&&... args)
     // requires
     //   std::is_base_of_v<PoolAllocatedObjectBase<typename memory_pool::size_type>, T>
     //     && std::is_constructible_v<T, Args&&..., allocation_size_type>
@@ -172,21 +182,31 @@ public:
     constexpr auto allocation_size = sizeof(T);
 
 
-    auto result = _do_pool_allocate(allocation_size);
+    auto result = _do_pool_allocate(allocation_size, add_info);
 
     KOKKOS_ASSERT(result.success && "Memory allocation failure");
+    
+    //printf("constructing task from pool: %08x, %d \n", result.pointer, allocation_size);
 
     auto rv = _do_contruct<T>(result.pointer, allocation_size, std::forward<Args>(args)...);
+    
+    //printf("task from pool: %08x, %08x \n", intptr_t(rv), alignof(T));
+    //fflush(stdout);
+    //KOKKOS_ENSURES(intptr_t(rv) % alignof(T) == 0 && "alignment not preserved!");
 
-    KOKKOS_ENSURES(intptr_t(rv) % alignof(T) == 0 && "alignment not preserved!");
-
+    //printf("returning constructed task...\n");
+    //fflush(stdout);
     return rv;
   }
 
   template <class T, class VLAValueType, class... Args>
   KOKKOS_INLINE_FUNCTION
   T*
-  allocate_and_construct_with_vla_emulation(allocation_size_type n_vla_entries, Args&&... args)
+  allocate_and_construct_with_vla_emulation(
+    allocation_size_type n_vla_entries,
+    const int add_info,
+    Args&&... args
+  )
     // requires
     //   std::is_base_of_v<PoolAllocatedObjectBase<typename memory_pool::size_type>, T>
     //     && std::is_base_of<ObjectWithVLAEmulation<T, VLAValueType>, T>::value
@@ -203,13 +223,19 @@ public:
     using vla_emulation_base = ObjectWithVLAEmulation<T, VLAValueType>;
 
     auto const allocation_size = vla_emulation_base::required_allocation_size(n_vla_entries);
-    auto result = _do_pool_allocate(allocation_size);
+    auto result = _do_pool_allocate(allocation_size, add_info);
+    
+    //printf("allocating vla object: %d, %08x \n", add_info, result.pointer);
+    //fflush(stdout);
 
     KOKKOS_ASSERT(result.success && "Memory allocation failure");
 
     auto rv = _do_contruct<T>(result.pointer, allocation_size, std::forward<Args>(args)...);
+    
+    //printf("vla object constructed: %d, %08x \n", add_info, result.pointer);
+    //fflush(stdout);
 
-    KOKKOS_ENSURES(intptr_t(rv) % alignof(T) == 0);
+    // KOKKOS_ENSURES(intptr_t(rv) % alignof(T) == 0);
 
     return rv;
   }
@@ -221,6 +247,14 @@ public:
     m_pool.deallocate((void*)&obj, 1);
     Kokkos::atomic_decrement(&m_count_alloc); // memory_order_relaxed
   }
+
+  KOKKOS_INLINE_FUNCTION
+  memory_pool& get_memory_pool() { return m_pool; }
+  KOKKOS_INLINE_FUNCTION
+  memory_pool const& get_memory_pool() const { return m_pool; }
+
+  KOKKOS_INLINE_FUNCTION
+  int allocation_count() const noexcept { return m_count_alloc; }
 };
 
 } /* namespace Impl */

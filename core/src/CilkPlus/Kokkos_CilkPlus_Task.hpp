@@ -147,8 +147,8 @@ public:
 	  int ndx = offset + i * layer_width + n;  // i is nodelet, n is layer index
 	  	  
 	  task_base_type * task_ptr = (task_base_type *)ptr;
-	  printf("inside task thread %d, %d : %08x \n", i, n, task_ptr);
-	  fflush(stdout);
+//	  printf("inside task thread %d, %d : %08x \n", i, n, task_ptr);
+//	  fflush(stdout);
 	  
 
          	  
@@ -164,7 +164,7 @@ public:
          auto current_task = OptionalRef<task_base_type>(*task_ptr);	  
          current_task->as_runnable_task().run(member);
          
-		 printf("task complete [%d,%d] -->\n", i, n);
+		 printf("task complete [%d,%d] %d -->\n", i, n, current_task->node_id);
 		 fflush(stdout);
      
           // Respawns are handled in the complete function
@@ -181,14 +181,14 @@ public:
 
   
   static void team_task_head(int offset, int i, scheduler_type const& scheduler, long* data_ref) {
-	  printf("team task head: %d, %d, %d.  \n", offset, i );
-	  fflush(stdout);
+//	  printf("team task head: %d, %d, %d.  \n", offset, i );
+//	  fflush(stdout);
 	  	  	  	  
 	  auto& queue = scheduler.queue(i);
       auto team_scheduler = scheduler.get_team_scheduler(i);
       
-      printf("head [%d] entering queue processing loop \n", i );
-	  fflush(stdout);      
+//      printf("head [%d] entering queue processing loop \n", i );
+//	  fflush(stdout);      
            
       int n = 0;
       while ( (!queue.is_done()) && n < layer_width ) {
@@ -214,16 +214,27 @@ public:
 	      RESCHEDULE();
 	    
  	  }
+ 	  cilk_sync;
   }
   
   static bool all_queues_are_done(scheduler_type const& scheduler) {
 	  bool bAllDone = true;
+	  char readyList[25];
 	  for ( int i = 0; i < NODELETS(); i++ ) {
+		  int nReady = scheduler.queue(i).ready_count();
+		  int hundreds = (nReady / 100);
+		  int tens = (nReady - (hundreds * 100)) / 10;
+		  int ones = nReady - (tens * 10);
+		  readyList[i*3+0] =  hundreds + 0x30;
+		  readyList[i*3+1] = tens + 0x30;
+		  readyList[i*3+2] = ones + 0x30;		  
 		  if (!scheduler.queue(i).is_done()) {
 			  bAllDone = false;
 			  break;
 		  }
 	  }
+	  readyList[24] = 0;
+	  printf("check queues done [%s] - %s \n", readyList, bAllDone ? "true" : "false" );
 	  return bAllDone;
   }
 
@@ -244,8 +255,8 @@ public:
     int offset = 0;
     while(not all_queues_are_done(scheduler)) {
 
-       printf("cilk task exec loop: %d \n", offset);
-       fflush(stdout);
+//       printf("cilk task exec loop: %d \n", offset);
+//       fflush(stdout);
        // blocks of 64 ... for now.  if the queue doesn't have 64, then they should all just return...
        for ( int i = 0; i < NODELETS(); i++ ) {
           cilk_spawn_at(&data_ref[i]) team_task_head( offset, i, scheduler, data_ref );

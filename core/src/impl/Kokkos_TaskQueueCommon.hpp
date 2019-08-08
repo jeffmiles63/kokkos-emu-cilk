@@ -97,6 +97,7 @@ public:
   }
 
   ~TaskQueueCommonMixin() {
+    KOKKOS_EXPECTS((Kokkos::memory_fence(), m_ready_count < 1));
     KOKKOS_EXPECTS(m_ready_count == 0);
   }
 
@@ -161,6 +162,7 @@ protected:
     TaskNode<TaskQueueTraits>&& task,
     TeamSchedulerInfo const& info
   ) {
+	printf("task consuming wait queue: %d\n", task.node_id);
     task.consume_wait_queue(
       _schedule_waiting_tasks_operation<TaskQueueTraits, TeamSchedulerInfo>{
         task,
@@ -184,6 +186,7 @@ protected:
   void _decrement_ready_count() {
     // TODO @tasking @memory_order DSH memory order
     Kokkos::atomic_decrement(&this->m_ready_count);
+    Kokkos::memory_fence();
   }
 
 public:
@@ -192,6 +195,12 @@ public:
   bool is_done() const noexcept {
     // TODO @tasking @memory_order DSH Memory order, instead of volatile
     return (*(volatile int*)(&m_ready_count)) == 0;
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  int32_t ready_count() const noexcept {
+    // TODO @tasking @memory_order DSH Memory order, instead of volatile
+    return (*(volatile int*)(&m_ready_count));
   }
 
   template <class TaskQueueTraits, class TeamSchedulerInfo>
@@ -203,9 +212,11 @@ public:
   )
   {
     if(task.get_respawn_flag()) {
+	  printf("rescheduling respawned task: %d\n", task.node_id);
       _self().schedule_runnable(std::move(task), info);
     }
     else {
+	  printf("completing task: %d\n", task.node_id);
       _complete_finished_task(std::move(task), info);
     }
     // A runnable task was popped from a ready queue finished executing.
@@ -226,6 +237,7 @@ public:
     AggregateTask<TaskQueueTraits, SchedulingInfo>&& task,
     TeamSchedulerInfo const& info
   ) {
+	printf("aggregate task complete: %d\n", task.node_id);
     // TODO @tasking DSH old code has a ifndef __HCC_ACCELERATOR__ here; figure out why
     _complete_finished_task(std::move(task), info);
   }
@@ -253,6 +265,14 @@ public:
     bool task_is_ready = true;
     bool scheduling_info_updated = false;
 
+    // do this before enqueueing and potentially losing exclusive access to task
+    bool task_is_respawning = task.get_respawn_flag();
+
+    // clear the respawn flag, since we're handling the respawn (if any) here.
+    // We must make sure this is written through the cache, since the next
+    // thread to access it might be a Cuda thread from a different thread block.
+    ((RunnableTaskBase<TaskQueueTraits> volatile&)task).set_respawn_flag(false);
+
     if(task.has_predecessor()) {
       // save the predecessor into a local variable, then clear it from the
       // task before adding it to the wait queue of the predecessor
@@ -262,19 +282,14 @@ public:
       auto& predecessor = task.get_predecessor();
       // This needs a load/store fence here, technically
       // making this a release store would also do this
-      task.clear_predecessor();
-
-      // do this before enqueueing and potentially losing exclusive access to task
-      bool task_is_respawning = task.get_respawn_flag();
-
-      // clear the respawn flag, since we're handling the respawn (if any) here
-      task.set_respawn_flag(false);
+      ((RunnableTaskBase<TaskQueueTraits> volatile&)task).clear_predecessor();
 
       // TODO @tasking @memory_order DSH remove this fence in favor of memory orders
       Kokkos::memory_fence(); // for now
 
       // Try to add the task to the predecessor's waiting queue.  If it fails,
       // the predecessor is already done
+      printf("schedule runnable adding task to predecessor to wait queue %d <- %d \n", predecessor.node_id, task.node_id);
       bool predecessor_not_ready = predecessor.try_add_waiting(task);
 
       // NOTE: if the predecessor was not ready and the task was enqueued,
@@ -313,10 +328,12 @@ public:
     if(scheduling_info_updated) {
       // We need to go back to the queue itself and see if it wants to schedule
       // somewhere else
+      printf("schedule runnable task: %d \n", task.node_id);
       _self().schedule_runnable(std::move(task), info);
     }
     // Put it in the appropriate ready queue if it's ready
     else if(task_is_ready) {
+	  printf("runnable task is ready: %d \n", task.node_id);
       // Increment the ready count
       _self()._increment_ready_count();
       // and enqueue the task
@@ -327,7 +344,9 @@ public:
           std::move(task), ready_queue, info
         );
       }
-    }
+    } else {
+		printf("schedule runnable ending without really doing anything %d ...\n", task.node_id);
+	}
 
     // Task may be enqueued and may be run at any point; don't touch it (hence
     // the use of move semantics)
@@ -390,6 +409,8 @@ public:
 
         // If adding the aggregate to the waiting queue succeeds, the predecessor is not
         // complete
+        printf("adding aggregate to predecessor wait queue %d\n", predecessor_ptr->node_id);
+        fflush(stdout);
         bool pred_not_ready = predecessor_ptr->try_add_waiting(aggregate);
 
         // NOTE! At this point it is unsafe to access aggregate (unless the

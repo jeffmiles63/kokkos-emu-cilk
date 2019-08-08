@@ -281,6 +281,8 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   bool is_ready() const noexcept {
+	if (m_task == nullptr) printf("is_ready returns false because task is empty \n");
+	if (m_task->wait_queue_is_consumed() == false) printf("is_ready returns false because wait queue is not consumed \n");
     return (m_task == nullptr) || m_task->wait_queue_is_consumed();
   }
 
@@ -472,7 +474,11 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   int is_ready() const noexcept
-  { return ( 0 == m_task ) || ( ((task_base*) task_base::LockTag) == m_task->m_wait ); }
+  { 
+	  if (m_task == nullptr) printf("is_ready returns false because task is empty \n");
+	  if ( ((task_base*) task_base::LockTag) == m_task->m_wait ) printf("is_ready returns false because wait is equal to lock \n");
+	  return ( 0 == m_task ) || ( ((task_base*) task_base::LockTag) == m_task->m_wait ); 
+  }
 
   KOKKOS_INLINE_FUNCTION
   const typename Impl::TaskResult< ValueType >::reference_type

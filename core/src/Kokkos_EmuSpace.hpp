@@ -763,7 +763,7 @@ private:
   //const Kokkos::Experimental::EmuReplicatedSpace * m_space ;
 
 public:
-
+  static void increment_repl_count ( int i, Kokkos::Impl::SharedAllocationRecord<void,void>* pRec );
   ~SharedAllocationRecord();
   SharedAllocationRecord() : RecordBase() {}
 

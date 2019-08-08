@@ -69,6 +69,8 @@
 
 namespace Kokkos {
 namespace Impl {
+	
+extern int get_next_node_id();
 
 enum TaskType : int16_t   { TaskTeam = 0 , TaskSingle = 1 , Aggregate = 2, TaskSpecial = -1 };
 
@@ -190,10 +192,11 @@ private:
 
   TaskType m_task_type;  // size 2
   priority_type m_priority; // size 2
-  bool m_is_respawning = false;
+  bool m_is_respawning = false;  
 
 public:
-
+  int node_id;
+  
   KOKKOS_INLINE_FUNCTION
   constexpr
   TaskNode(
@@ -211,8 +214,12 @@ public:
       m_wait_queue(),
       m_ready_queue_base(queue_base),
       m_task_type(task_type),
-      m_priority(static_cast<priority_type>(priority))
-  { }
+      m_priority(static_cast<priority_type>(priority)),
+      m_is_respawning(false), 
+      node_id( Kokkos::Impl::get_next_node_id() )
+  { 
+	  printf("task node created: %d\n", node_id);
+  }
 
   TaskNode() = delete;
   TaskNode(TaskNode const&) = delete;
@@ -227,6 +234,9 @@ public:
   bool is_runnable() const noexcept { return m_task_type != TaskType::Aggregate; }
 
   KOKKOS_INLINE_FUNCTION
+  bool is_runnable() const volatile noexcept { return m_task_type != TaskType::Aggregate; }
+
+  KOKKOS_INLINE_FUNCTION
   bool is_single_runnable() const noexcept { return m_task_type == TaskType::TaskSingle; }
 
   KOKKOS_INLINE_FUNCTION
@@ -238,6 +248,7 @@ public:
   KOKKOS_INLINE_FUNCTION
   RunnableTaskBase<TaskQueueTraits>&
   as_runnable_task() & {
+	if (!this->is_runnable()) printf("this->is_runnable() fails for task %d\n", this->node_id);
     KOKKOS_EXPECTS(this->is_runnable());
     return static_cast<RunnableTaskBase<TaskQueueTraits>&>(*this);
   }
@@ -245,13 +256,31 @@ public:
   KOKKOS_INLINE_FUNCTION
   RunnableTaskBase<TaskQueueTraits> const&
   as_runnable_task() const & {
+	if (!this->is_runnable()) printf("this->is_runnable() fails for task %d\n", this->node_id);
     KOKKOS_EXPECTS(this->is_runnable());
     return static_cast<RunnableTaskBase<TaskQueueTraits> const&>(*this);
   }
 
   KOKKOS_INLINE_FUNCTION
+  RunnableTaskBase<TaskQueueTraits> volatile&
+  as_runnable_task() volatile & {
+	if (!this->is_runnable()) printf("this->is_runnable() fails for task %d\n", this->node_id);
+    KOKKOS_EXPECTS(this->is_runnable());
+    return static_cast<RunnableTaskBase<TaskQueueTraits> volatile&>(*this);
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  RunnableTaskBase<TaskQueueTraits> const volatile&
+  as_runnable_task() const volatile & {
+	if (!this->is_runnable()) printf("this->is_runnable() fails for task %d\n", this->node_id);
+    KOKKOS_EXPECTS(this->is_runnable());
+    return static_cast<RunnableTaskBase<TaskQueueTraits> const volatile&>(*this);
+  }
+
+  KOKKOS_INLINE_FUNCTION
   RunnableTaskBase<TaskQueueTraits>&&
   as_runnable_task() && {
+	if (!this->is_runnable()) printf("this->is_runnable() fails for task %d\n", this->node_id);
     KOKKOS_EXPECTS(this->is_runnable());
     return static_cast<RunnableTaskBase<TaskQueueTraits>&&>(*this);
   }
@@ -282,7 +311,8 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   bool try_add_waiting(task_base_type& depends_on_this) {
-    return m_wait_queue.try_push(depends_on_this);
+	printf("adding task to wait queue %d <-- %d \n", node_id, depends_on_this.node_id);
+    return m_wait_queue.try_push(depends_on_this);    
   }
 
   template <class Function>
@@ -311,6 +341,12 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
+  void set_priority(TaskPriority priority) volatile noexcept {
+    KOKKOS_EXPECTS(!this->is_enqueued());
+    m_priority = (priority_type)priority;
+  }
+
+  KOKKOS_INLINE_FUNCTION
   TaskPriority get_priority() const noexcept {
     return (TaskPriority)m_priority;
   }
@@ -319,7 +355,14 @@ public:
   bool get_respawn_flag() const { return m_is_respawning; }
 
   KOKKOS_INLINE_FUNCTION
-  void set_respawn_flag(bool value = true) { m_is_respawning = value; }
+  void set_respawn_flag(bool value = true) {
+    m_is_respawning = value;
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void set_respawn_flag(bool value = true) volatile {
+    m_is_respawning = value;
+  }
 
 };
 
@@ -343,6 +386,11 @@ private:
 
 public:
 
+  template <class... Args>    
+  KOKKOS_INLINE_FUNCTION
+  constexpr explicit
+  SchedulingInfoStorage ( Args&&... args ) : 
+               base_t( std::forward<Args>(args)... ) {}
   using base_t::base_t;
 
   KOKKOS_INLINE_FUNCTION
@@ -460,6 +508,9 @@ public:
   KOKKOS_INLINE_FUNCTION
   void clear_predecessor() { m_predecessor = nullptr; }
 
+  KOKKOS_INLINE_FUNCTION
+  void clear_predecessor() volatile { m_predecessor = nullptr; }
+
   template <class SchedulingInfo>
   KOKKOS_INLINE_FUNCTION
   SchedulingInfo&
@@ -490,7 +541,7 @@ public:
   KOKKOS_INLINE_FUNCTION
   void set_predecessor(task_base_type& predecessor)
   {
-    KOKKOS_EXPECTS(m_predecessor == nullptr || &predecessor == m_predecessor);
+    KOKKOS_EXPECTS(m_predecessor == nullptr);
     // Increment the reference count so that predecessor doesn't go away
     // before this task is enqueued.
     // (should be memory order acquire)
@@ -500,6 +551,15 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   void acquire_predecessor_from(runnable_task_type& other)
+  {
+    KOKKOS_EXPECTS(m_predecessor == nullptr || other.m_predecessor == m_predecessor);
+    // since we're transfering, no need to modify the reference count
+    m_predecessor = other.m_predecessor;
+    other.m_predecessor = nullptr;
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void acquire_predecessor_from(runnable_task_type& other) volatile
   {
     KOKKOS_EXPECTS(m_predecessor == nullptr || other.m_predecessor == m_predecessor);
     // since we're transfering, no need to modify the reference count
@@ -590,20 +650,19 @@ class alignas(16) RunnableTask
     public FunctorType
 {
 private:
+  using base_t = TaskResultStorage<
+    ResultType,
+    SchedulingInfoStorage<
+      RunnableTaskBase<TaskQueueTraits>,
+      typename Scheduler::task_queue_type::task_scheduling_info_type
+    >
+  >;
 
   using runnable_task_base_type = RunnableTaskBase<TaskQueueTraits>;
   using scheduler_type = Scheduler;
   using scheduling_info_type =
       typename scheduler_type::task_scheduling_info_type;
-  using scheduling_info_storage_base =
-    TaskResultStorage<
-      ResultType,
-      SchedulingInfoStorage<
-        runnable_task_base_type,
-        scheduling_info_type
-      >
-    >;
-  using base_t = scheduling_info_storage_base;
+  using scheduling_info_storage_base = base_t;
 
   using task_base_type = TaskNode<TaskQueueTraits>;
   using specialization = TaskQueueSpecialization<scheduler_type>;
@@ -684,6 +743,9 @@ public:
 #else
       0 == member->team_rank();
 #endif
+
+    // Ensure that the respawn flag is set to zero
+    self->set_respawn_flag(false);
 
     //task->apply_functor(member, TaskResult<result_type>::ptr(task));
     task->apply_functor(member, task->value_pointer());

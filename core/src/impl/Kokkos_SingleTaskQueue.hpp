@@ -80,15 +80,16 @@ namespace Impl {
 template <
   class ExecSpace,
   class MemorySpace,
-  class TaskQueueTraits
+  class TaskQueueTraits,
+  class MemoryPool
 >
 class SingleTaskQueue
-  : public TaskQueueMemoryManager<ExecSpace, MemorySpace>,
-    public TaskQueueCommonMixin<SingleTaskQueue<ExecSpace, MemorySpace, TaskQueueTraits>>
+  : public TaskQueueMemoryManager<ExecSpace, MemorySpace, MemoryPool>,
+    public TaskQueueCommonMixin<SingleTaskQueue<ExecSpace, MemorySpace, TaskQueueTraits, MemoryPool>>
 {
 private:
 
-  using base_t = TaskQueueMemoryManager<ExecSpace, MemorySpace>;
+  using base_t = TaskQueueMemoryManager<ExecSpace, MemorySpace, MemoryPool>;
   using common_mixin_t = TaskQueueCommonMixin<SingleTaskQueue>;
 
   struct EmptyTeamSchedulerInfo { };
@@ -165,6 +166,24 @@ public:
     // Task may be enqueued and may be run at any point; don't touch it (hence
     // the use of move semantics)
   }
+  
+  // returns true if pop_ready_task will return a valid task object.
+  KOKKOS_FUNCTION
+  bool 
+  tasks_waiting() {
+	  bool return_value = false;
+      for(int i_priority = 0; i_priority < NumQueue; ++i_priority) {
+
+         // Check for a team task with this priority
+         if ( ( !m_ready_queues[i_priority][TaskTeam].empty() ) ||
+              ( !m_ready_queues[i_priority][TaskSingle].empty() ) ) {
+			 return_value = true;
+			 break;      
+	     }
+      }
+    // if nothing was found, return a default-constructed (empty) OptionalRef
+    return return_value;
+  }
 
   KOKKOS_FUNCTION
   OptionalRef<task_base_type>
@@ -178,11 +197,17 @@ public:
 
       // Check for a team task with this priority
       return_value = m_ready_queues[i_priority][TaskTeam].pop();
-      if(return_value) return return_value;
+      //printf("pop ready ptr %d, %d, %08x \n", i_priority, TaskTeam, (unsigned long)(task_base_type*)return_value.get());
+      //fflush(stdout);
+      if(return_value.get()) return return_value;
 
       // Check for a single task with this priority
       return_value = m_ready_queues[i_priority][TaskSingle].pop();
-      if(return_value) return return_value;
+      //printf("pop ready ptr %d, %d, %08x \n", i_priority, TaskSingle, (unsigned long)(task_base_type*)return_value.get());
+      //fflush(stdout);     
+      if(return_value.get()) {
+		  return return_value;	      
+	  }
 
     }
     // if nothing was found, return a default-constructed (empty) OptionalRef

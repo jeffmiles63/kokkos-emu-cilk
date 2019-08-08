@@ -75,16 +75,51 @@ struct LockBasedLIFOCommon
 
   using node_type = SimpleSinglyLinkedListNode<>;
 
+  long queue_lock;  
   static constexpr uintptr_t LockTag = ~uintptr_t(0);
   static constexpr uintptr_t EndTag = ~uintptr_t(1);
+  int curQueueCnt; 
 
   OwningRawPtr<node_type> m_head = (node_type*)EndTag;
 
   KOKKOS_INLINE_FUNCTION
   bool _try_push_node(node_type& node) {
-
     KOKKOS_EXPECTS(!node.is_enqueued());
+    
+    // lock the queue
+    //printf("update queue lock II: %08x \n", &(this->queue_lock) );
+    long test_lock = Kokkos::atomic_compare_exchange(&(this->queue_lock), (long)0, (long)1);
 
+    if( test_lock == 0) {
+       auto* volatile & next = LinkedListNodeAccess::next_ptr(node);		
+
+       // set task->next to the head of the queue
+       next = this->m_head;
+       
+       this->m_head = &node;
+       
+       this->curQueueCnt++;
+       
+       // unlock the queue
+       ::Kokkos::atomic_exchange(&(this->queue_lock), 0);
+
+       //printf("update head: %08x, queue cnt = %d \n", this->m_head, this->curQueueCnt);
+       //fflush(stdout);    
+     
+       return true;  // successful update        
+    }
+
+    // Failed, replace 'task->m_next' value since 'task' remains
+    // not a member of a queue.
+
+    // TODO @tasking @memory_order DSH this should have a memory order and not a memory fence
+    LinkedListNodeAccess::mark_as_not_enqueued(node);
+
+    // fence to emulate acquire semantics on next
+    // Do not proceed until 'next' has been stored.    
+
+    return false;	
+/*
     auto* volatile & next = LinkedListNodeAccess::next_ptr(node);
 
     // store the head of the queue in a local variable
@@ -101,17 +136,18 @@ struct LockBasedLIFOCommon
       // fence to emulate acquire semantics on next and release semantics on
       // the store of m_head
       // Do not proceed until 'next' has been stored.
-      ::Kokkos::memory_fence();
+      Kokkos::memory_fence();
 
       // store the old head
       auto* const old_head_tmp = old_head;
 
       // attempt to swap task with the old head of the queue
       // as if this were done atomically:
-      //   if(*queue == old_head) {
-      //     *queue = task;
+      //   if(m_head == old_head) {
+      //     m_head = &node;
       //   }
-      //   old_head = *queue;
+      //   old_head = m_head;
+      //printf("update queue head: %08x \n", m_head);
       old_head = ::Kokkos::atomic_compare_exchange(&m_head, old_head, &node);
 
       if(old_head_tmp == old_head) return true;
@@ -127,7 +163,9 @@ struct LockBasedLIFOCommon
     // Do not proceed until 'next' has been stored.
     ::Kokkos::memory_fence();
 
-    return false;
+    return false;	  
+*/
+
   }
 
   bool _is_empty() const noexcept {
@@ -158,7 +196,7 @@ public:
 public:
 
 
-  LockBasedLIFO() = default;
+  LockBasedLIFO() { this->queue_lock = 0; this->curQueueCnt = 0; }
   LockBasedLIFO(LockBasedLIFO const&) = delete;
   LockBasedLIFO(LockBasedLIFO&&) = delete;
   LockBasedLIFO& operator=(LockBasedLIFO const&) = delete;
@@ -175,85 +213,64 @@ public:
   KOKKOS_INLINE_FUNCTION
   OptionalRef<T> pop(bool abort_on_locked = false)
   {
+    //printf("pop(): %08x \n", this->m_head);
+    //fflush(stdout);
     // Put this in here to avoid requiring value_type to be complete until now.
     static_assert(
       std::is_base_of<intrusive_node_base_type, value_type>::value,
       "Intrusive linked-list value_type must be derived from intrusive_node_base_type"
     );
-
-    // We can't use the static constexpr LockTag directly because
-    // atomic_compare_exchange needs to bind a reference to that, and you
-    // can't do that with static constexpr variables.
-    auto* const lock_tag = (node_type*)base_t::LockTag;
-
-    // TODO @tasking @memory_order DSH shouldn't this be a relaxed atomic load?
-    // start with the return value equal to the head
-    auto* rv = this->m_head;
+    
+    // just check one time for end tag...pop is allowed to return nothing...
+    if ( this->m_head == (node_type*)base_t::EndTag ) {
+	   return { };	
+	}
 
     // Retry until the lock is acquired or the queue is empty.
-    while(rv != (node_type*)base_t::EndTag) {
+    while(true) {
 
-      // The only possible values for the queue are
-      // (1) lock, (2) end, or (3) a valid task.
-      // Thus zero will never appear in the queue.
-      //
-      // If queue is locked then just read by guaranteeing the CAS will fail.
-      KOKKOS_ASSERT(rv != nullptr);
+       // lock the queue
+       //printf("update queue lock: %08x \n", &(this->queue_lock) );
+       long test_lock = Kokkos::atomic_compare_exchange(&(this->queue_lock), (long)0, (long)1);
 
-      if(rv == lock_tag) {
-        // TODO @tasking @memory_order DSH this should just be an atomic load followed by a continue
-        // just set rv to nullptr for now, effectively turning the
-        // atomic_compare_exchange below into a load
-        rv = nullptr;
-        if(abort_on_locked) {
-          break;
+       if( test_lock == 0) {
+		   
+		   auto* rv = this->m_head;
+		   
+		   if (rv == (node_type*)base_t::EndTag ) {
+			   Kokkos::atomic_exchange(&(this->queue_lock), 0);
+			   break;
+		   }
+
+           // TODO @tasking @memory_order DSH check whether the volatile is needed here
+           OwningRawPtr<node_type> next = LinkedListNodeAccess::next_ptr(*rv);
+
+           // This algorithm is not lockfree because a adversarial scheduler could
+           // context switch this thread at this point and the rest of the threads
+           // calling this method would never make forward progress
+
+           this->m_head = next;
+        
+          // Mark rv as popped by assigning nullptr to the next
+          LinkedListNodeAccess::mark_as_not_enqueued(*rv);
+
+          this->curQueueCnt--;
+          
+          Kokkos::atomic_exchange(&(this->queue_lock), 0); // unlock the queue
+          
+          //printf("pop, remaining queue count = %d \n", this->curQueueCnt);
+          //fflush(stdout);
+        
+          //Kokkos::Experimental::print_pointer( 0, this, "queue this ptr");
+          //Kokkos::Experimental::print_pointer( 0, rv, "queue task ptr");
+          return OptionalRef<T>{ *static_cast<T*>(rv) };
+       } else {       
+           if(abort_on_locked) {		     
+             break;
+           }
         }
-      }
-
-      auto* const old_rv = rv;
-
-      // TODO @tasking @memory_order DSH this should be a weak compare exchange in a loop
-      rv = Kokkos::atomic_compare_exchange(&(this->m_head), old_rv, lock_tag);
-
-      if(rv == old_rv) {
-        // CAS succeeded and queue is locked
-        //
-        // This thread has locked the queue and removed 'rv' from the queue.
-        // Extract the next entry of the queue from 'rv->m_next'
-        // and mark 'rv' as popped from a queue by setting
-        // 'rv->m_next = nullptr'.
-        //
-        // Place the next entry in the head of the queue,
-        // which also unlocks the queue.
-        //
-        // This thread has exclusive access to
-        // the queue and the popped task's m_next.
-
-        // TODO @tasking @memory_order DSH check whether the volatile is needed here
-        auto* volatile& next = LinkedListNodeAccess::next_ptr(*rv); //->m_next;
-
-        // This algorithm is not lockfree because a adversarial scheduler could
-        // context switch this thread at this point and the rest of the threads
-        // calling this method would never make forward progress
-
-        // TODO @tasking @memory_order DSH I think this needs to be a atomic store release (and the memory fence needs to be removed)
-        // Lock is released here
-        this->m_head = next;
-
-        // Mark rv as popped by assigning nullptr to the next
-        LinkedListNodeAccess::mark_as_not_enqueued(*rv);
-
-        ::Kokkos::memory_fence();
-
-        return OptionalRef<T>{ *static_cast<T*>(rv) };
-      }
-
-      // Otherwise, the CAS got a value that didn't match (either because
-      // another thread locked the queue and we observed the lock tag or because
-      // another thread replaced the head and now we want to try to lock the
-      // queue with that as the popped item.  Either way, try again.
     }
-
+    
     // Return an empty OptionalRef by calling the default constructor
     return { };
   }
@@ -265,11 +282,19 @@ public:
     // TODO @tasking @optimization DSH do this with fewer retries
     return pop(/* abort_on_locked = */ true);
   }
+  
+  KOKKOS_INLINE_FUNCTION
+  bool try_push(node_type& node) {
+    KOKKOS_EXPECTS(!node.is_enqueued());
+    
+    return this->_try_push_node(node); 
+  
+  }
 
   KOKKOS_INLINE_FUNCTION
   bool push(node_type& node)
   {
-    while(!this->_try_push_node(node)) { /* retry until success */ }
+    while(!this->try_push(node)) { /* retry until success */ }
     // for consistency with push interface on other queue types:
     return true;
   }
@@ -346,8 +371,20 @@ public:
   KOKKOS_INLINE_FUNCTION
   bool try_push(node_type& node)
   {
-    return this->_try_push_node(node);
-    // Ensures: (return value is true) || (node.is_enqueued() == false);
+	  if (this->m_head == (node_type*)ConsumedTag)
+	     return false;
+	
+	  //printf("try push onto single consume queue: 0x%lx - %d, 0x%lx - %d \n", 
+	  //   &node, mw_ptrtonodelet(&node), &(this->m_head), mw_ptrtonodelet(&(this->m_head)) );
+      return this->_try_push_node(node);
+      // Ensures: (return value is true) || (node.is_enqueued() == false);
+  }
+  
+  KOKKOS_INLINE_FUNCTION
+  void push(node_type& node) {
+	  while (try_push(node) == false) {
+		  RESCHEDULE();
+	  }
   }
 
   template <class Function>
@@ -355,36 +392,47 @@ public:
   void consume(Function&& f) {
     auto* const consumed_tag = (node_type*)ConsumedTag;
 
-    // Swap the Consumed tag into the head of the queue:
+    // lock the queue
+    //printf("update queue lock II: %08x \n", &(this->queue_lock) );
+    long test_lock = Kokkos::atomic_compare_exchange(&(this->queue_lock), (long)0, (long)1);
 
-    // (local variable used for assertion only)
-    // TODO @tasking @memory_order DSH this should have memory order release, I think
-    auto old_head = Kokkos::atomic_exchange(&(this->m_head), consumed_tag);
+    if( test_lock == 0) {
 
-    // Assert that the queue wasn't consumed before this
-    // This can't be an expects clause because the acquire fence on the read
-    // would be a side-effect
-    KOKKOS_ASSERT(old_head != consumed_tag);
+       // Swap the Consumed tag into the head of the queue:
 
-    // We now have exclusive access to the queue; loop over it and call
-    // the user function
-    while(old_head != (node_type*)base_t::EndTag) {
+       // (local variable used for assertion only)
+       // TODO @tasking @memory_order DSH this should have memory order release, I think
+       auto old_head = Kokkos::atomic_exchange(&(this->m_head), consumed_tag);
 
-      // get the Node to make the call with
-      auto* call_arg = old_head;
+       // Assert that the queue wasn't consumed before this
+       // This can't be an expects clause because the acquire fence on the read
+       // would be a side-effect
+       KOKKOS_ASSERT(old_head != consumed_tag);
 
-      // advance the head
-      old_head = LinkedListNodeAccess::next_ptr(*old_head);
+       // We now have exclusive access to the queue; loop over it and call
+       // the user function
+       while(old_head != (node_type*)base_t::EndTag) {
 
-      // Mark as popped before proceeding
-      LinkedListNodeAccess::mark_as_not_enqueued(*call_arg);
+          // get the Node to make the call with
+          auto* call_arg = old_head;
 
-      // Call the user function
-      auto& arg = *static_cast<T*>(call_arg);
-      f(std::move(arg));
+          // advance the head
+          old_head = LinkedListNodeAccess::next_ptr(*old_head);
 
-    }
+          // Mark as popped before proceeding
+          LinkedListNodeAccess::mark_as_not_enqueued(*call_arg);
+      
+          printf("queue consume call user function: 0x%lx \n", call_arg);
+          fflush(stdout);
 
+          // Call the user function
+          auto& arg = *static_cast<T*>(call_arg);
+          f(std::move(arg));
+
+       }
+              // unlock the queue
+       ::Kokkos::atomic_exchange(&(this->queue_lock), 0);
+     }
   }
 
 };
