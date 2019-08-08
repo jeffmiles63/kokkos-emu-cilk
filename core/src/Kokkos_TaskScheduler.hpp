@@ -64,6 +64,8 @@
 #include <impl/Kokkos_TaskTeamMember.hpp>
 #include <impl/Kokkos_SimpleTaskScheduler.hpp>
 
+
+
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
 
@@ -134,11 +136,6 @@ private:
     return { m_track, &m_queue->get_team_queue(team_rank) };
   }
 
-  KOKKOS_INLINE_FUNCTION
-  constexpr queue_type& queue() const noexcept {
-    return *m_queue;
-  }
-
   //----------------------------------------
 
   KOKKOS_INLINE_FUNCTION
@@ -192,6 +189,8 @@ private:
       f.m_task = new (task_storage) task_type( std::forward<FunctorType>(arg_functor) );
 
       f.m_task->m_apply      = arg_function;
+      printf("new task: %08x \n", (unsigned long)f.m_task->m_apply);
+      fflush(stdout);
       //f.m_task->m_destroy    = arg_destroy;
       f.m_task->m_queue      = m_queue;
       f.m_task->m_next       = arg_predecessor_task;
@@ -210,7 +209,10 @@ private:
       m_queue->schedule_runnable( f.m_task );
       // This task may be updated or executed at any moment,
       // even during the call to 'schedule'.
-    }
+    } else {
+		printf("unable to create the task...no storage returned\n");
+		fflush(stdout);
+	}
 
     return f;
 
@@ -284,6 +286,12 @@ public:
     {}
 
   //----------------------------------------
+
+  KOKKOS_INLINE_FUNCTION
+  queue_type& queue() const noexcept {
+    KOKKOS_EXPECTS(m_queue != nullptr);
+    return *m_queue;
+  }
 
   KOKKOS_INLINE_FUNCTION
   memory_pool * memory() const noexcept
