@@ -250,6 +250,9 @@ private:
       FunctorType, scheduler_type
     >;
 
+//    printf("spawn() simple task scheduler constructing runnable task \n");
+//    fflush(stdout);
+    
     // Reference count starts at two:
     //   +1 for the matching decrement when task is complete
     //   +1 for the future
@@ -263,12 +266,16 @@ private:
     );
 
     if(arg_predecessor_task != nullptr) {
+//	  printf("scheduling task with predecessor \n");
+//	  fflush(stdout);
       m_queue->initialize_scheduling_info_from_predecessor(
         runnable_task, *arg_predecessor_task
       );
       runnable_task.set_predecessor(*arg_predecessor_task);
     }
     else {
+//	  printf("scheduling task without predecessor \n");
+	  //fflush(stdout);		
       m_queue->initialize_scheduling_info_from_team_scheduler_info(
         runnable_task, team_scheduler_info()
       );
@@ -518,6 +525,7 @@ public:
           task_type, task_base_type*
         >(
           /* n_vla_entries = */ n_predecessors,
+          /* queue_ndx = */ 0, 
           /* aggregate_predecessor_count = */ n_predecessors,
           /* queue_base = */ &q,
           /* initial_reference_count = */ 2
@@ -563,6 +571,7 @@ public:
       task_type, task_base_type*
     >(
       /* n_vla_entries = */ n_calls,
+      /* queue_ndx = */ 0, 
       /* aggregate_predecessor_count = */ n_calls,
       /* queue_base = */ m_queue,
       /* initial_reference_count = */ 2

@@ -218,7 +218,7 @@ public:
       m_is_respawning(false), 
       node_id( Kokkos::Impl::get_next_node_id() )
   { 
-	  printf("task node created: %d\n", node_id);
+	  //printf("task node created: %d\n", node_id);
   }
 
   TaskNode() = delete;
@@ -311,7 +311,7 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   bool try_add_waiting(task_base_type& depends_on_this) {
-	printf("adding task to wait queue %d <-- %d \n", node_id, depends_on_this.node_id);
+	//printf("adding task to wait queue %d <-- %d \n", node_id, depends_on_this.node_id);
     return m_wait_queue.try_push(depends_on_this);    
   }
 
@@ -570,7 +570,12 @@ public:
   template <class TeamMember>
   KOKKOS_INLINE_FUNCTION
   void run(TeamMember& member) {
-    (*m_apply)(this, &member);
+	if (m_apply != nullptr) {
+       (*m_apply)(this, &member);
+    } else {
+		printf("run apply is nullptr %d \n", mw_ptrtonodelet(this));
+		KOKKOS_ASSERT(0 && "run apply is nullptr")
+	}
   }
 };
 

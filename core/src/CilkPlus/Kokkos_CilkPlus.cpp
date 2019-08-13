@@ -56,6 +56,14 @@
 
 namespace Kokkos {
 namespace Impl {
+
+static int next_node_id = 0;
+	
+extern int get_next_node_id() {
+	//return Kokkos::atomic_fetch_add( &next_node_id, 1 );
+	return next_node_id++;
+}
+
 namespace {
 
 HostThreadTeamData g_serial_thread_team_data ;
@@ -187,7 +195,9 @@ void CilkPlus::finalize()
 }
 
 const char* CilkPlus::name() { return "CilkPlus"; }
-}
+
+} // namespace Experimental
+	
 } // namespace Kokkos
 
 #else

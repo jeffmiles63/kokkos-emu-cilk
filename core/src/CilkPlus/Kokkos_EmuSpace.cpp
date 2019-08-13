@@ -571,7 +571,7 @@ SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , void >::
 void SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , void >::increment_repl_count ( int i, Kokkos::Impl::SharedAllocationRecord<void,void>* pRec ) {
   // printf("increment count on node: %d\n", i);
    Kokkos::Impl::SharedAllocationRecord<void,void>* pL = (Kokkos::Impl::SharedAllocationRecord<void,void>*)mw_get_nth(pRec,i);
-   const int old_count = Kokkos::atomic_fetch_add( & pL->m_count , 1 );
+   Kokkos::atomic_fetch_add( & pL->m_count , 1 );
 }
 
 
@@ -589,7 +589,7 @@ custom_increment( Kokkos::Impl::SharedAllocationRecord<void,void>* pRec ) {
    for ( int i = 0; i < NODELETS(); i++) {
   //    printf("increment count on node: %d\n", i);
       Kokkos::Impl::SharedAllocationRecord<void,void>* pL = (Kokkos::Impl::SharedAllocationRecord<void,void>*)mw_get_nth(pRec,i);
-      const int old_count = Kokkos::atomic_fetch_add( & pL->m_count , 1 );
+      Kokkos::atomic_fetch_add( & pL->m_count , 1 );
    }
 }
 
@@ -668,8 +668,7 @@ SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void >::custom_d
    constexpr static SharedAllocationRecord<void,void> * zero = nullptr ;
 #endif
    typedef Kokkos::Impl::SharedAllocationRecord<void,void> record_base;
-   bool bFreeMemory = false;
-   long * lRef = (long*)Kokkos::Experimental::getRefPtr();
+   bool bFreeMemory = false;   
    record_base* rb = (record_base*)mw_get_nth(pRec, NODE_ID());
    EmuStridedAllocationHeader * pEmuHead = (EmuStridedAllocationHeader*)rb->m_alloc_ptr;
    void* sd = pEmuHead->m_stridedData;
@@ -1009,7 +1008,7 @@ reallocate_tracked( void * const arg_alloc_ptr
 SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , void > *
 SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , void >::get_record( void * alloc_ptr )
 {
-  using RecordBase = SharedAllocationRecord< void , void > ;
+  //using RecordBase = SharedAllocationRecord< void , void > ;
   using Header     = SharedAllocationHeader ;
   using RecordEmu = SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , void > ;
 

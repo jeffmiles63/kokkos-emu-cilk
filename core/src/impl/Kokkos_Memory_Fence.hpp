@@ -70,7 +70,7 @@ void memory_fence()
 #elif defined( KOKKOS_ENABLE_OPENMP_ATOMICS )
   #pragma omp flush
 #elif defined( KOKKOS_ENABLE_EMU )
-   cilk_sync;
+   //cilk_sync;
 #elif defined( KOKKOS_ENABLE_WINDOWS_ATOMICS )
   MemoryBarrier();
 #elif !defined( KOKKOS_ENABLE_SERIAL_ATOMICS )
@@ -87,7 +87,7 @@ KOKKOS_FORCEINLINE_FUNCTION
 void store_fence()
 {
 #if defined( KOKKOS_ENABLE_EMU )
-   cilk_sync;
+   //cilk_sync;
 #elif defined( KOKKOS_ENABLE_ASM ) && defined( KOKKOS_ENABLE_ISA_X86_64 )
   asm volatile (
 	  "sfence" ::: "memory"
@@ -106,7 +106,7 @@ KOKKOS_FORCEINLINE_FUNCTION
 void load_fence()
 {
 #if defined( KOKKOS_ENABLE_EMU )
-   cilk_sync;
+   //cilk_sync;
 #elif defined( KOKKOS_ENABLE_ASM ) && defined( KOKKOS_ENABLE_ISA_X86_64 )
   asm volatile (
 	  "lfence" ::: "memory"

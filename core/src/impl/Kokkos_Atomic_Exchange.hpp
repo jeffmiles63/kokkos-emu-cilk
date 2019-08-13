@@ -212,7 +212,7 @@ T local_atomic_exchange( T* dest, const T val ){
         break;
      }     
      nCnt++;
-     if (nCnt %10000) printf("thread waiting for atomic exchange ...\n");     
+     //if (nCnt %10000) printf("thread waiting for atomic exchange ...\n");     
      Kokkos::Impl::emu_sleep((unsigned long)dest);
    }   
    return orig;

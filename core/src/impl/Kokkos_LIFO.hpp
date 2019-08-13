@@ -268,6 +268,7 @@ public:
            if(abort_on_locked) {		     
              break;
            }
+           RESCHEDULE();
         }
     }
     
@@ -394,9 +395,12 @@ public:
 
     // lock the queue
     //printf("update queue lock II: %08x \n", &(this->queue_lock) );
+    //fflush(stdout);
     long test_lock = Kokkos::atomic_compare_exchange(&(this->queue_lock), (long)0, (long)1);
 
     if( test_lock == 0) {
+	   //printf("queue lock II obtained: %08x \n", &(this->queue_lock) );
+       //fflush(stdout);
 
        // Swap the Consumed tag into the head of the queue:
 
@@ -422,8 +426,8 @@ public:
           // Mark as popped before proceeding
           LinkedListNodeAccess::mark_as_not_enqueued(*call_arg);
       
-          printf("queue consume call user function: 0x%lx \n", call_arg);
-          fflush(stdout);
+          //printf("queue consume call user function: 0x%lx \n", call_arg);
+          //fflush(stdout);
 
           // Call the user function
           auto& arg = *static_cast<T*>(call_arg);
@@ -432,7 +436,14 @@ public:
        }
               // unlock the queue
        ::Kokkos::atomic_exchange(&(this->queue_lock), 0);
-     }
+	   //printf("queue lock II released: %08x \n", &(this->queue_lock) );
+       //fflush(stdout);
+       
+     } else {
+	   //printf("queue lock II failed: %08x \n", &(this->queue_lock) );
+       //fflush(stdout);		 
+	 }
+     
   }
 
 };

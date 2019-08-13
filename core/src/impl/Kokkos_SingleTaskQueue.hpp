@@ -167,24 +167,6 @@ public:
     // the use of move semantics)
   }
   
-  // returns true if pop_ready_task will return a valid task object.
-  KOKKOS_FUNCTION
-  bool 
-  tasks_waiting() {
-	  bool return_value = false;
-      for(int i_priority = 0; i_priority < NumQueue; ++i_priority) {
-
-         // Check for a team task with this priority
-         if ( ( !m_ready_queues[i_priority][TaskTeam].empty() ) ||
-              ( !m_ready_queues[i_priority][TaskSingle].empty() ) ) {
-			 return_value = true;
-			 break;      
-	     }
-      }
-    // if nothing was found, return a default-constructed (empty) OptionalRef
-    return return_value;
-  }
-
   KOKKOS_FUNCTION
   OptionalRef<task_base_type>
   pop_ready_task(
@@ -213,6 +195,36 @@ public:
     // if nothing was found, return a default-constructed (empty) OptionalRef
     return return_value;
   }
+  
+  KOKKOS_FUNCTION
+  OptionalRef<task_base_type>
+  pop_ready_task(
+    team_scheduler_info_type const& info,
+    bool try_once
+  )
+  {
+    OptionalRef<task_base_type> return_value;
+    // always loop in order of priority first, then prefer team tasks over single tasks
+    for(int i_priority = 0; i_priority < NumQueue; ++i_priority) {
+
+      // Check for a team task with this priority
+      return_value = m_ready_queues[i_priority][TaskTeam].pop(try_once);
+      //printf("pop ready ptr %d, %d, %08x \n", i_priority, TaskTeam, (unsigned long)(task_base_type*)return_value.get());
+      //fflush(stdout);
+      if(return_value.get()) return return_value;
+
+      // Check for a single task with this priority
+      return_value = m_ready_queues[i_priority][TaskSingle].pop(try_once);
+      //printf("pop ready ptr %d, %d, %08x \n", i_priority, TaskSingle, (unsigned long)(task_base_type*)return_value.get());
+      //fflush(stdout);     
+      if(return_value.get()) {
+		  return return_value;	      
+	  }
+
+    }
+    // if nothing was found, return a default-constructed (empty) OptionalRef
+    return return_value;
+  }  
 
   KOKKOS_INLINE_FUNCTION
   constexpr team_scheduler_info_type

@@ -87,7 +87,7 @@ private:
          }
        }
 #else
-      long * refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
+      //long * refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
       int mz = Kokkos::Experimental::EmuReplicatedSpace::memory_zones();
       int sc_count = par_loop / mz + ( ( (par_loop % mz) == 0) ? 0 : 1 );
       printf(" tree spawn parallel for: b= %d, e = %d, l = %d, par = %d, sc = %d, int = %d \n", b, e, len, par_loop, sc_count, int_loop);

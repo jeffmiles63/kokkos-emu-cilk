@@ -56,7 +56,7 @@ void TestViewAccess( int N ) {
    }, total );
     
 
-   long * refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
+//   long * refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
 /*   for (int i = 0; i < Kokkos::Experimental::EmuReplicatedSpace::memory_zones(); i++) {
       MIGRATE(&refPtr[i]);
 //      Kokkos::View< Scalar*, Kokkos::Experimental::EmuLocalSpace > local_space_view( Kokkos::ViewAllocateWithoutInitializing("local"), N );

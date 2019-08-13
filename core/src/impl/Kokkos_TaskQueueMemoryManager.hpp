@@ -165,6 +165,14 @@ private:
 public:
 
   explicit
+  TaskQueueMemoryManager(TaskQueueMemoryManager const& rhs)
+    : m_pool(rhs.m_pool) {}
+
+  explicit
+  TaskQueueMemoryManager(TaskQueueMemoryManager && rhs)
+    : m_pool(std::move(rhs.m_pool)) {}
+
+  explicit
   TaskQueueMemoryManager(memory_pool const& pool)
     : m_pool(pool)
   { //printf("task queue memory manager \n"); fflush(stdout);
@@ -174,13 +182,12 @@ public:
   template <class T, class... Args>
   KOKKOS_FUNCTION
   T*
-  allocate_and_construct(size_t add_info,Args&&... args)
+  allocate_and_construct(size_t add_info, Args&&... args)
     // requires
     //   std::is_base_of_v<PoolAllocatedObjectBase<typename memory_pool::size_type>, T>
     //     && std::is_constructible_v<T, Args&&..., allocation_size_type>
   {
     constexpr auto allocation_size = sizeof(T);
-
 
     auto result = _do_pool_allocate(allocation_size, add_info);
 

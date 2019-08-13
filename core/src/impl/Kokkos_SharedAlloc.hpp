@@ -62,7 +62,7 @@ namespace Impl {
    #define KOKKOS_LOCK_PREFIX extern
 #endif
 
-#define KOKKOS_MEMORY_LOCK_LEN 1024
+#define KOKKOS_MEMORY_LOCK_LEN 128
 
 struct AddrLock {
    unsigned long id;
@@ -442,6 +442,8 @@ public:
   SharedAllocationTracker( const SharedAllocationTracker & rhs )
     : m_record_bits( KOKKOS_IMPL_SHARED_ALLOCATION_CARRY_RECORD_BITS(rhs, true) )
     {
+	  //printf("shared allocation tracker...\n");
+	  //fflush(stdout);
       KOKKOS_IMPL_SHARED_ALLOCATION_TRACKER_INCREMENT
     }
 

@@ -83,32 +83,38 @@ struct FibonacciTask
   int n;
   future_type fn_1;
   future_type fn_2;
+  
 
   KOKKOS_INLINE_FUNCTION
   explicit
   FibonacciTask(int num) noexcept
     : n(num)
-  { printf("constructing new fib task: %d \n", n); }
+  { // printf("constructing new fib task: %d \n", n); 
+  }
 
   template <class TeamMember>
   KOKKOS_INLINE_FUNCTION
   void operator()(TeamMember& member, int& result) {
-	printf("Task operator: %d\n", result);
-	fflush(stdout);
+	//printf("Task operator: [%d %d], [%d %d]\n", member.league_rank(), member.team_rank(), n, result);
+	//fflush(stdout);
     auto& scheduler = member.scheduler();
     if(n < 2) {
-	  printf("recursive end of fib task: %d \n", n);
-	  fflush(stdout);
+	  //printf("recursive end of fib task: %d \n", n);
+	  //fflush(stdout);
       // this is the recursive base case
       result = n;
     }
     else if(!fn_1.is_null() && !fn_2.is_null()) {
-	  printf("respawn fib task: %d \n", n);
+	  //printf("respawn fib task: %d  %s - %s \n", n,
+	  //    (fn_1.is_ready()) ? "true" : "false",
+	  //    (fn_2.is_ready()) ? "true" : "false");
+	  //fflush(stdout);
       // We only get here after respawn, so just set the result
       result = fn_1.get() + fn_2.get();
     }
     else {
-	  printf("new fib task: %d \n", n);
+	  //printf("recursive layer fib task: %d \n", n);
+	  //fflush(stdout);
       // Spawn child tasks for the subproblems
       fn_1 = Kokkos::task_spawn(
         Kokkos::TaskSingle(scheduler),
@@ -119,10 +125,14 @@ struct FibonacciTask
         FibonacciTask{n-2}
       );
       
+	  //printf("fib task waiting: %d %d %d \n", n, n-1, n-2);
+	  //fflush(stdout);      
       // Create an aggregate predecessor for our respawn
       Kokkos::BasicFuture<void, Scheduler> fib_array[] = { fn_1, fn_2 };
       auto f_all = scheduler.when_all(fib_array, 2);
 
+	//  printf("fib task calling respawn: %d %d %d \n", n, n-1, n-2);
+	//  fflush(stdout);             
       // Respawn this task with `f_all` as a predecessor
       Kokkos::respawn(this, f_all);
     }
@@ -170,8 +180,11 @@ namespace Test {
         );
       }
     }
-    else {
-      printf("  Error! Result of Fibonacci(%d) is not ready\n", n);
+    else { 
+		if (result.is_null())
+		    printf("  Error! Result of Fibonacci(%d) is not null\n", n);
+		else
+            printf("  Error! Result of Fibonacci(%d) is not ready\n", n);
     }
 
   }

@@ -74,7 +74,10 @@ public:
   OptionalRef() = default;
 
   KOKKOS_INLINE_FUNCTION
-  OptionalRef(OptionalRef const&) = default;
+  OptionalRef(OptionalRef const& other) { 
+	  //printf("Copy Construct optional ref: %08x\n", other.m_value);
+      m_value = other.m_value;
+  }
   
   KOKKOS_INLINE_FUNCTION
   OptionalRef(OptionalRef&&) = default;
@@ -88,6 +91,7 @@ public:
   void
   operator=(OptionalRef const volatile& other) volatile noexcept
   {
+	//printf("Copy Construct volatile optional ref: %08x\n", other.m_value);
     m_value = other.m_value;
   }
 
@@ -98,16 +102,28 @@ public:
   ~OptionalRef() = default;
 
   KOKKOS_INLINE_FUNCTION
-  explicit OptionalRef(T& arg_value) : m_value(&arg_value) { }
+  explicit OptionalRef(T& arg_value) : m_value(&arg_value) { 
+	  //printf("Construct optional ref from ptr: %08x\n", &arg_value);
+  }
 
   KOKKOS_INLINE_FUNCTION
-  explicit OptionalRef(std::nullptr_t) : m_value(nullptr) { }
+  explicit OptionalRef(std::nullptr_t) : m_value(nullptr) {
+	  //printf("Construct optional ref from nullptr\n");
+   }
 
   KOKKOS_INLINE_FUNCTION
-  OptionalRef& operator=(T& arg_value) { m_value = &arg_value; return *this; }
+  OptionalRef& operator=(T& arg_value) { 
+	 // printf("Assignment operator for optional ref from ptr: %08x\n", &arg_value);
+	  m_value = &arg_value; 
+	  return *this; 
+  }
 
   KOKKOS_INLINE_FUNCTION
-  OptionalRef& operator=(std::nullptr_t) { m_value = nullptr; return *this; }
+  OptionalRef& operator=(std::nullptr_t) { 
+	 // printf("Assignment operator from null\n");
+	  m_value = nullptr; 
+	  return *this; 
+  }
 
   //----------------------------------------
   

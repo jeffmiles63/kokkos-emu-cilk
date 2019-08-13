@@ -50,6 +50,7 @@
 #include <Kokkos_Macros.hpp>
 #if defined( KOKKOS_ENABLE_CILKPLUS )
 
+#include <Kokkos_Core_fwd.hpp>
 
 #include <cstddef>
 #include <iosfwd>
@@ -174,6 +175,7 @@ public:
   inline static unsigned max_hardware_threads() { return thread_pool_size(0); }
 
   static const char* name();
+
   //--------------------------------------------------------------------------
 };
 }
@@ -748,6 +750,10 @@ public:
 
 #include <CilkPlus/Kokkos_CilkPlus_Range.hpp>
 #include <CilkPlus/Kokkos_CilkPlus_MDRange.hpp>
+
+#include <CilkPlus/Kokkos_EmuMemoryPool.hpp>
+#include <CilkPlus/Kokkos_SimpleEmuTaskScheduler.hpp>
+#include <CilkPlus/Kokkos_CilkPlus_Task.hpp>
 
 #endif // defined( KOKKOS_ENABLE_CILKPLUS )
 #endif /* #define KOKKOS_CILKPLUS_HPP */

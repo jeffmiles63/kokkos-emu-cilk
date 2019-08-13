@@ -159,7 +159,7 @@ int atomic_compare_exchange( volatile int * const dest, const int compare, const
         break;
      }
      nCnt++;
-     if (nCnt %10000) printf("thread waiting for atomic compare exchange ...\n");
+     //if (nCnt %10000) printf("thread waiting for atomic compare exchange ...\n");
      Kokkos::Impl::emu_sleep((unsigned long)dest);
   }
   
@@ -185,7 +185,7 @@ unsigned int atomic_compare_exchange( volatile unsigned int * const dest, const 
         break;
      }
      nCnt++;
-     if (nCnt %10000) printf("thread waiting for atomic compare exhange II...\n");
+     //if (nCnt %10000) printf("thread waiting for atomic compare exhange II...\n");
      Kokkos::Impl::emu_sleep((unsigned long)dest);
   }
   
@@ -211,7 +211,7 @@ unsigned long long int atomic_compare_exchange( volatile unsigned long long int 
         break;
      }
      nCnt++;
-     if (nCnt %10000) printf("thread waiting for atomic compare exchange III...\n");
+     //if (nCnt %10000) printf("thread waiting for atomic compare exchange III...\n");
      Kokkos::Impl::emu_sleep((unsigned long)dest);
   }
   return return_val;
@@ -260,7 +260,7 @@ T atomic_compare_exchange( volatile T * const dest , const T & compare ,
         break;
      }
      nCnt++;
-     if (nCnt %10000) printf("thread waiting for atomic compare exchange IV ...\n");
+     //if (nCnt %10000) printf("thread waiting for atomic compare exchange IV ...\n");
      RESCHEDULE();
   }
 

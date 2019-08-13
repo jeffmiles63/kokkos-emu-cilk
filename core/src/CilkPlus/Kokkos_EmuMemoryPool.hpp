@@ -95,7 +95,7 @@ private:
   typedef Kokkos::Impl::SharedAllocationRecord
     < base_memory_space, void >  Record ;
 
-  uint32_t * m_sb_state_array ;
+  long ** m_sb_state_array ;
   uint32_t   m_sb_state_size ;
   uint32_t   m_sb_size_lg2 ;
   uint32_t   m_max_block_size_lg2 ;
@@ -332,16 +332,16 @@ public:
       // Allocation:
 
       const size_t header_size = m_data_offset * sizeof(uint32_t);
-      const size_t alloc_size  = header_size +
-                                 ( size_t(m_sb_count) << m_sb_size_lg2 ) * 
+      const size_t alloc_size  = ( header_size +
+                                 ( size_t(m_sb_count) << m_sb_size_lg2 ) ) * 
                                  Kokkos::Experimental::EmuReplicatedSpace::memory_zones();
       m_sb_lock_array = mw_malloc1dlong(Kokkos::Experimental::EmuReplicatedSpace::memory_zones());
-      m_sb_state_array = (uint32_t *) memspace.allocate( alloc_size );
+      m_sb_state_array = (long**)memspace.allocate( alloc_size );
       
       //printf("%s memory pool allocated: %08x \n", memspace.name(), (unsigned long)m_sb_state_array);
 
       for ( int i = 0; i < NODELETS(); i++) {
-		  uint32_t * p_state_array = (uint32_t*)&(((long**)m_sb_state_array)[i][0]);
+		  uint32_t * p_state_array = (uint32_t*)&(m_sb_state_array[i][0]);
 		  cilk_spawn_at(p_state_array) initialize_pool_state(i, p_state_array, number_block_sizes);
       }
   	  cilk_sync;  
@@ -426,7 +426,7 @@ public:
       //Kokkos::Experimental::print_pointer( add_info, (void*)&(((long*)m_sb_state_array)[add_info]), "sb state array" );      
       //MIGRATE(&(((long*)m_sb_state_array)[add_info]) );
       
-      uint32_t * p_state_array = (uint32_t*)&(((long**)m_sb_state_array)[add_info][0]);
+      uint32_t * p_state_array = (uint32_t*)&(m_sb_state_array[add_info][0]);
      
       //Kokkos::Experimental::print_pointer( add_info, p_state_array, "pool state array" );
       //printf("pool state array: %08x \n", (unsigned long)p_state_array);
@@ -688,7 +688,7 @@ public:
 
       size_t add_info = mw_ptrtonodelet(p);
       //printf("deallocate called on %d \n", (int)add_info);
-      uint32_t * p_state_array = (uint32_t*)&(((long**)m_sb_state_array)[add_info][0]);
+      uint32_t * p_state_array = (uint32_t*)&(m_sb_state_array[add_info][0]);
       
       // need to lock the address ...
       bool bWaiting = true;
@@ -763,7 +763,7 @@ public:
 #endif
         Kokkos::abort("Kokkos MemoryPool::deallocate given erroneous pointer");
       }
-      ATOMIC_SWAP(&m_sb_lock_array[add_info], add_info);
+      ATOMIC_SWAP(&m_sb_lock_array[add_info], 0);
     }
   // end deallocate
   //--------------------------------------------------------------------------

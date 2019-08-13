@@ -94,7 +94,8 @@ class TaskExec<Kokkos::Experimental::CilkPlus, Scheduler> {
   int team_rank() const { return m_team_rank; }
   int team_size() const { return m_team_size; }
   int league_rank() const { return m_league_rank; }
-  int league_size() const { return emu_league_size; }
+  int league_size() { return emu_league_size; }
+  static constexpr int max_league_size() { return emu_league_size; }
 
   void team_barrier() const {
     if (1 < m_team_size) {
@@ -144,37 +145,34 @@ public:
   }
 
   static void launch_task( void * ptr, int offset, int i, int n, scheduler_type const& scheduler, long* data_ref) {
-	  int ndx = offset + i * layer_width + n;  // i is nodelet, n is layer index
-	  	  
 	  task_base_type * task_ptr = (task_base_type *)ptr;
 //	  printf("inside task thread %d, %d : %08x \n", i, n, task_ptr);
 //	  fflush(stdout);
-	  
-
-         	  
-	  auto& queue = scheduler.queue(i);    
-      auto team_scheduler = scheduler.get_team_scheduler(i);
+        	  
+	  auto& queue = scheduler.queue();    
       member_type member(scheduler, n, layer_width, i);
 	  
 	  if ( task_ptr ) {
 		  		  
-		 printf("task run [%d,%d] -->\n", i, n);
-		 fflush(stdout);
+		 //printf("task run [%d,%d] %d -->\n", i, n, task_ptr->node_id);
+		 //fflush(stdout);
 		 
          auto current_task = OptionalRef<task_base_type>(*task_ptr);	  
          current_task->as_runnable_task().run(member);
          
-		 printf("task complete [%d,%d] %d -->\n", i, n, current_task->node_id);
-		 fflush(stdout);
+		 //printf("task complete [%d,%d] %d -->\n", i, n, current_task->node_id);
+		 //fflush(stdout);
+		 
+		 int team_assoc = mw_ptrtonodelet(task_ptr);
      
           // Respawns are handled in the complete function
           queue.complete(
              (*std::move(current_task)).as_runnable_task(),
-             team_scheduler.team_scheduler_info()
+             queue.initial_team_scheduler_info(team_assoc)
           );	  
  	  } else {
-		  printf("no task for this thread: %d \n", ndx);
-		  fflush(stdout);
+		  //printf("no task for this thread: %d \n", ndx);
+		  //fflush(stdout);
 	  }
 	  
   }
@@ -184,57 +182,81 @@ public:
 //	  printf("team task head: %d, %d, %d.  \n", offset, i );
 //	  fflush(stdout);
 	  	  	  	  
-	  auto& queue = scheduler.queue(i);
       auto team_scheduler = scheduler.get_team_scheduler(i);
+      auto& team_queue = team_scheduler.queue();
       
-//      printf("head [%d] entering queue processing loop \n", i );
+//      printf("head [%d] entering queue processing loop %d \n", i , team_scheduler.team_scheduler_info().team_association);
 //	  fflush(stdout);      
            
       int n = 0;
-      while ( (!queue.is_done()) && n < layer_width ) {
+      while ( true ) {
 		  
-		 //printf("head [%d] looking for task %d \n", i, n );
-		 //fflush(stdout);
-		 auto current_task = OptionalRef<task_base_type>(nullptr);
-         current_task = queue.pop_ready_task(team_scheduler.team_scheduler_info());
-         //printf("[%d] task head returned from pop_ready_task \n", i);
-         //fflush(stdout);
+ 		  //printf("head [%d] looking for task %d \n", i, n );
+		  //fflush(stdout);
+		  auto current_task = OptionalRef<task_base_type>(nullptr);
+          current_task = team_queue.pop_ready_task(team_scheduler.team_scheduler_info());
+
+          //printf("[%d] task head returned from pop_ready_task - %d \n", i, mw_ptrtonodelet(current_task.get()));
+          //fflush(stdout);
 	  
-	     if ( current_task.get() != nullptr ) {
-		  	 printf("head [%d] launching task thread %d : %08x \n", i, n, current_task.get());
-		  	 fflush(stdout);
+	      if ( current_task.get() != nullptr ) {
+		   	 //printf("head [%d] launching task thread %d : %08x \n", i, n, current_task.get());
+		  	 //fflush(stdout);
 		  	 
 		  	 void* ptr = (void*)current_task.get();
              
-		     cilk_spawn_at(ptr) launch_task( ptr, offset, i, n, scheduler, data_ref ); 
-		     n++;
+		     cilk_spawn_at(ptr) launch_task( ptr, offset, i, n, team_scheduler, data_ref ); 
+		     n = n+1;
+		     if (n > layer_width) {
+				 offset = layer_width * i;
+				 n=0;
+			 }		     
+		     // need to set offset once n > layer width...
 
 	      }
 	      
+	      if ( team_queue.is_done(i) && all_queues_are_done(scheduler) ) {
+			  break;
+		  }
 	      RESCHEDULE();
 	    
  	  }
  	  cilk_sync;
+// 	  printf("exit head task loop: %d - %d \n", i, n);
+ 	  //fflush(stdout);
   }
   
   static bool all_queues_are_done(scheduler_type const& scheduler) {
 	  bool bAllDone = true;
+#ifdef DEBUG_QUEUE_CNT
 	  char readyList[25];
-	  for ( int i = 0; i < NODELETS(); i++ ) {
-		  int nReady = scheduler.queue(i).ready_count();
+	  for (int i = 0; i < member_type::max_league_size(); i++ ) {
+ 		  readyList[i*3+0] =  0x30;
+		  readyList[i*3+1] =  0x30;
+		  readyList[i*3+2] =  0x30;		  
+	  }
+#endif
+	  for ( int i = 0; i < member_type::max_league_size(); i++ ) {
+#ifdef DEBUG_QUEUE_CNT		  
+		  int nReady = scheduler.queue().team_ready_count(i);
 		  int hundreds = (nReady / 100);
 		  int tens = (nReady - (hundreds * 100)) / 10;
 		  int ones = nReady - (tens * 10);
 		  readyList[i*3+0] =  hundreds + 0x30;
 		  readyList[i*3+1] = tens + 0x30;
 		  readyList[i*3+2] = ones + 0x30;		  
-		  if (!scheduler.queue(i).is_done()) {
+#endif		  
+		  if (!scheduler.queue().team_queue_done(i)) {
 			  bAllDone = false;
-			  break;
+#ifndef DEBUG_QUEUE_CNT
+              break;
+#endif			  
 		  }
 	  }
+#ifdef DEBUG_QUEUE_CNT	  
 	  readyList[24] = 0;
 	  printf("check queues done [%s] - %s \n", readyList, bAllDone ? "true" : "false" );
+#endif
 	  return bAllDone;
   }
 
@@ -253,17 +275,11 @@ public:
     long * data_ref = mw_malloc1dlong(NODELETS());
 
     int offset = 0;
-    while(not all_queues_are_done(scheduler)) {
-
-//       printf("cilk task exec loop: %d \n", offset);
-//       fflush(stdout);
-       // blocks of 64 ... for now.  if the queue doesn't have 64, then they should all just return...
-       for ( int i = 0; i < NODELETS(); i++ ) {
-          cilk_spawn_at(&data_ref[i]) team_task_head( offset, i, scheduler, data_ref );
-       }
-       cilk_sync;
-       offset += 64;
+    // blocks of 64 ... for now.  if the queue doesn't have 64, then they should all just return...
+    for ( int i = 0; i < NODELETS(); i++ ) {
+       cilk_spawn_at(&data_ref[i]) team_task_head( offset, i, scheduler, data_ref );
     }
+    cilk_sync;       
     
   }
   
@@ -319,7 +335,7 @@ public:
 	  }
 	  
 	  int ndx = offset + i; 	  
-	  printf("task thread: %d\n", ndx);
+//	  printf("task thread: %d\n", ndx);
 	  auto& queue = scheduler.queue();
       Impl::HostThreadTeamData& self = *Impl::serial_get_thread_team_data();
       auto team_scheduler = scheduler.get_team_scheduler(ndx);

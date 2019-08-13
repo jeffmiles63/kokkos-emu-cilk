@@ -186,10 +186,10 @@ T local_atomic_sub ( volatile T * const dest, const T val )
    while (bWaiting) {
      if (Impl::lock_addr((unsigned long)dest)) {
         rVal = *dest;
-        ENTER_CRITICAL_SECTION();
+        //ENTER_CRITICAL_SECTION();
         T new_value = rVal - val;
         *dest = new_value;        
-        EXIT_CRITICAL_SECTION();
+        //EXIT_CRITICAL_SECTION();
         Impl::unlock_addr((unsigned long)dest);
         bWaiting = false;
      } else {     

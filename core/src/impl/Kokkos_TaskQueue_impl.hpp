@@ -106,6 +106,7 @@ void TaskQueue< ExecSpace, MemorySpace>::decrement
 {
   task_root_type volatile & t = *task ;
 
+  //printf("template tasknode decrement: %08x \n", &(t.m_ref_count));
   const int count = Kokkos::atomic_fetch_add(&(t.m_ref_count),-1);
 
 #if KOKKOS_IMPL_DEBUG_TASKDAG_SCHEDULING
@@ -153,12 +154,12 @@ void * TaskQueue< ExecSpace, MemorySpace>::allocate( size_t n )
 {
   void * const p = m_memory.allocate(n);
 
-  //if ( p ) {
+  if ( p ) {
     //Kokkos::atomic_increment( & m_accum_alloc );
-    //Kokkos::atomic_increment( & m_count_alloc );
+    Kokkos::atomic_increment( & m_count_alloc );
 
     //if ( m_max_alloc < m_count_alloc ) m_max_alloc = m_count_alloc ;
-  //}
+  }
 
   return p ;
 }
@@ -168,7 +169,7 @@ KOKKOS_FUNCTION
 void TaskQueue< ExecSpace, MemorySpace>::deallocate( void * p , size_t n )
 {
   m_memory.deallocate( p , n );
-  //Kokkos::atomic_decrement( & m_count_alloc );
+  Kokkos::atomic_decrement( & m_count_alloc );
 }
 
 //----------------------------------------------------------------------------

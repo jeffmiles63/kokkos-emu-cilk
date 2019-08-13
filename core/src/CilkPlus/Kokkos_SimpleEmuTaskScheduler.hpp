@@ -58,6 +58,7 @@
 #include <impl/Kokkos_TaskQueue.hpp>
 #include <impl/Kokkos_SingleTaskQueue.hpp>
 #include <impl/Kokkos_MultipleTaskQueue.hpp>
+#include <impl/Kokkos_DistributedTaskQueue.hpp>
 #include <impl/Kokkos_TaskQueueMultiple.hpp>
 #include <impl/Kokkos_TaskPolicyData.hpp>
 #include <impl/Kokkos_TaskTeamMember.hpp>
@@ -288,8 +289,8 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   bool is_ready() const noexcept {
-	if (m_task == nullptr) printf("is_ready returns false because task is empty \n");
-	if (m_task->wait_queue_is_consumed() == false) printf("is_ready returns false because wait queue is not consumed %d \n", m_task->node_id);	  
+	//if (m_task == nullptr) printf("is_ready returns false because task is empty \n");
+	//if (m_task->wait_queue_is_consumed() == false) printf("is_ready returns false because wait queue is not consumed %d \n", m_task->node_id);	  
     return (m_task == nullptr) || m_task->wait_queue_is_consumed();
   }
 
@@ -298,6 +299,8 @@ public:
   get() const
   {
     KOKKOS_EXPECTS(is_ready());
+    //printf("returning future of ready task: %d \n", m_task->node_id);
+    //fflush(stdout);
     return static_cast<result_storage_type*>(m_task)->value_reference();
     //return Impl::TaskResult<ValueType>::get(m_task);
   }
@@ -310,7 +313,7 @@ public:
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
 
-using cilk_queue_type = Impl::SingleTaskQueue<
+using cilk_queue_type = Impl::DistributedTaskQueue<
     Kokkos::Experimental::CilkPlus,
     Kokkos::Experimental::EmuStridedSpace,
     Impl::TaskQueueTraitsLockBased
@@ -361,30 +364,6 @@ private:
   using memory_space_storage = Impl::MemorySpaceInstanceStorage<memory_space>;
   using team_scheduler_info_storage = Impl::NoUniqueAddressMemberEmulation<team_scheduler_info_type>;
 
-  const long max_team_size = 8;
-  void * m_queue_rep = nullptr;
-  long queue_node = 0;
-  
-  KOKKOS_INLINE_FUNCTION
-  task_queue_type* _get_queue( int i = 0 ) const {
-	  if ( m_queue_rep != nullptr )
-	  {
-		  //Kokkos::Experimental::print_pointer( i, m_queue_rep, "task queue - head");
-		  //fflush(stdout);
-	      task_queue_type * rec = (task_queue_type*)&(((long**)m_queue_rep)[i][0]);
-	      //Kokkos::Experimental::print_pointer( i, rec, "task queue - rec");
-	      //fflush(stdout);
-
-	      return rec; 
-	  } else {
-		  return nullptr;
-	  }
-  }
-  
-  long get_scheduler_node( void * ptr ) {
-	  return queue_node;
-  }  
-
   KOKKOS_INLINE_FUNCTION
   static constexpr task_base_type* _get_task_ptr(std::nullptr_t) { return nullptr; }
 
@@ -410,43 +389,40 @@ private:
     FunctorType&& functor
   )
   {
-    KOKKOS_EXPECTS(m_queue_rep != nullptr);
 
     using functor_future_type = future_type_for_functor<typename std::decay<FunctorType>::type>;
     using task_type = typename task_queue_type::template runnable_task_type<
       FunctorType, scheduler_type
     >;
     
-    int nNode = get_scheduler_node( NULL );
-    
-    printf("scheduler constructing runnable task on queue %d \n", nNode);
-    fflush(stdout);    
-    
-    task_queue_type* queue = _get_queue(nNode);
+    //printf("scheduler constructing runnable task with league rank = %d \n", team_scheduler_info().team_association);
+    //fflush(stdout);    
+
+    int nNode = team_scheduler_info().team_association;
     
     // Reference count starts at two:
     //   +1 for the matching decrement when task is complete
     //   +1 for the future
-    auto& runnable_task = *queue->template allocate_and_construct<task_type>(
+    auto& runnable_task = *(m_queue->template allocate_and_construct<task_type>(
       /* node id = */ nNode,
       /* functor = */ std::forward<FunctorType>(functor),
       /* apply_function_ptr = */ apply_function_ptr,
       /* task_type = */ static_cast<Impl::TaskType>(TaskEnum),
       /* priority = */ arg_priority,
-      /* queue_base = */ queue,
+      /* queue_base = */ m_queue,
       /* initial_reference_count = */ 2
-    );
+    ));
     //printf("ready to initialize the runnable task: %08x \n", &runnable_task);
     //fflush(stdout);
 
     if(arg_predecessor_task != nullptr) {
-      queue->initialize_scheduling_info_from_predecessor(
+      m_queue->initialize_scheduling_info_from_predecessor(
         runnable_task, *arg_predecessor_task
       );
       runnable_task.set_predecessor(*arg_predecessor_task);
     }
     else {
-      queue->initialize_scheduling_info_from_team_scheduler_info(
+      m_queue->initialize_scheduling_info_from_team_scheduler_info(
         runnable_task, team_scheduler_info()
       );
     }
@@ -455,7 +431,7 @@ private:
 
     Kokkos::memory_fence(); // fence to ensure dependent stores are visible
 
-    queue->schedule_runnable(
+    m_queue->schedule_runnable(
       std::move(runnable_task),
       team_scheduler_info()
     );
@@ -464,7 +440,9 @@ private:
     return rv;
   }
 
-
+  // JSM Note:  Eventually need to resolve ref counts for referenced internal queues and
+  //            delete the accordingly when the task scheduler is done/deleted
+  queue_type* m_queue;
 public:
 
   //----------------------------------------------------------------------------
@@ -475,20 +453,18 @@ public:
   KOKKOS_INLINE_FUNCTION
   SimpleEmuTaskScheduler( const SimpleEmuTaskScheduler& rhs ) : execution_space_storage(rhs),
                                                           memory_space_storage(rhs),
-                                                          m_queue_rep( rhs.m_queue_rep ),
-                                                          queue_node( 0 ) {
-															  //int next = rhs.queue_node+1;
-															  //queue_node = (next >= max_team_size) ? 0 : next;
-															  //printf("emu task scheduler copy Constructor called: %08x, %d \n", m_queue_rep, queue_node);
-															  //fflush(stdout);															  
+                                                          m_queue( rhs.m_queue ) {
+															  this->team_scheduler_info() = rhs.team_scheduler_info();
+															  //printf("emu scheduler Constructor copy with association = %d \n", team_scheduler_info().team_association);
+															  //fflush(stdout);																	  
 														  }
 														  
   KOKKOS_INLINE_FUNCTION
   SimpleEmuTaskScheduler( SimpleEmuTaskScheduler&& rhs ) : execution_space_storage(std::move(rhs)),
                                                           memory_space_storage(std::move(rhs)),
-                                                          m_queue_rep( std::move(rhs.m_queue_rep) ),
-                                                          queue_node( std::move(rhs.queue_node) ) {
-															  //printf("emu task scheduler move Constructor called: %08x, %d \n", m_queue_rep, queue_node);
+                                                          m_queue( std::move(rhs.m_queue) ) {
+															  this->team_scheduler_info() = rhs.team_scheduler_info();
+															  //printf("emu task scheduler move Constructor with association = %d \n", team_scheduler_info().team_association);
 															  //fflush(stdout);															  
 														  }														  
 
@@ -499,66 +475,29 @@ public:
     memory_pool const& arg_memory_pool
   ) : execution_space_storage(arg_execution_space),
       memory_space_storage(arg_memory_space)
-  {
-	//printf("constructing new task scheduler \n");
-    //fflush(stdout);
-
-    // Ask the task queue how much space it needs (usually will just be
-    // sizeof(task_queue_type), but some queues may need additional storage
-    // dependent on runtime conditions or properties of the execution space)
-    auto const allocation_size = task_queue_type::task_queue_allocation_size(
-      arg_execution_space,
-      arg_memory_space,
-      arg_memory_pool
-    );
-        
-    //printf("allocating queue memory %d \n", allocation_size);
-    //fflush(stdout);
-    
-    m_queue_rep = arg_memory_space.allocate( allocation_size * NODELETS() );  // create strided space as big as allocation size for each node 
-      
-    for ( int i = 0; i < NODELETS(); i++) { 
-		long* refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
-		
-		cilk_spawn_at(&refPtr[i]) initialize_queue( i, arg_execution_space,
-		                                                    arg_memory_space,
-		                                                    arg_memory_pool );
-	}
-	cilk_sync;
+  {	
+	  Kokkos::HostSpace hsp;
+	  m_queue = (queue_type*)hsp.allocate(sizeof(queue_type));
+      new (m_queue) queue_type(arg_execution_space,
+                               arg_memory_space,
+                               arg_memory_pool,
+                               specialization::member_type::max_league_size());
+	  team_scheduler_info() = m_queue->initial_team_scheduler_info(0); // default to zero...
+	  //printf("constructing new task scheduler \n");
+      //fflush(stdout);        
   }
   
-  KOKKOS_INLINE_FUNCTION
-  void initialize_queue( int i, execution_space const& arg_execution_space,
-                                     memory_space const& arg_memory_space,
-                                     memory_pool const& arg_memory_pool ) {
-										 
-      auto * loc_rec = (task_queue_type*)&(((long**)m_queue_rep)[i][0]);
-      new (loc_rec) task_queue_type(
-                            arg_execution_space,
-                            arg_memory_space,
-                            arg_memory_pool
-                            );
-  }
-
   explicit
   SimpleEmuTaskScheduler(
     execution_space const& arg_execution_space,
     memory_pool const& pool
   ) : SimpleEmuTaskScheduler(arg_execution_space, memory_space{}, pool)
-  { 
-	  //printf("constructing new task scheduler \n");
-	  //fflush(stdout);
-	  /* forwarding ctor, must be empty */ 
-  }
+  { /* forwarding ctor, must be empty */ }
 
   explicit
   SimpleEmuTaskScheduler(memory_pool const& pool)
     : SimpleEmuTaskScheduler(execution_space{}, memory_space{}, pool)
-  { 
-	  //printf("constructing new task scheduler \n");
-	  //fflush(stdout);
-	  /* forwarding ctor, must be empty */ 
-  }
+  {  /* forwarding ctor, must be empty */  }
 
   SimpleEmuTaskScheduler(
     memory_space const & arg_memory_space,
@@ -574,42 +513,25 @@ public:
           mempool_max_block_size, mempool_superblock_size
         )
       )  
-  { 
-	  //printf("constructing new task scheduler \n");
-	  //fflush(stdout);
-	  /* forwarding ctor, must be empty */ 
-  }
+  { /* forwarding ctor, must be empty */  }
 
   // </editor-fold> end Constructors, destructor, and assignment }}}2
   //----------------------------------------------------------------------------
 
   // Note that this is an expression of shallow constness
   KOKKOS_INLINE_FUNCTION
-  task_queue_type& queue() const
-  {
-    KOKKOS_EXPECTS(m_queue_rep != nullptr);
-    return *(_get_queue(0));
+  task_queue_type & queue() const
+  {    
+    return *m_queue;
   }
-  
-  // Note that this is an expression of shallow constness
-  KOKKOS_INLINE_FUNCTION
-  task_queue_type& queue(int rank_in_league) const
-  {
-    KOKKOS_EXPECTS(m_queue_rep != nullptr);
-    return *(_get_queue(rank_in_league));
-  }
-  
 
   KOKKOS_INLINE_FUNCTION
   SimpleEmuTaskScheduler
   get_team_scheduler(int rank_in_league) const noexcept
   {
-    KOKKOS_EXPECTS(m_queue_rep != nullptr);
-    auto rv = SimpleEmuTaskScheduler{ *this };
-    
-    task_queue_type* queue = _get_queue(rank_in_league);    
-    
-    rv.team_scheduler_info() = queue->initial_team_scheduler_info(rank_in_league);
+    auto rv = SimpleEmuTaskScheduler( *this );
+    task_queue_type& queue = rv.queue();    
+    rv.team_scheduler_info() = queue.initial_team_scheduler_info(rank_in_league);
     return rv;
   }
 
@@ -719,11 +641,10 @@ public:
 
     using task_type = typename task_queue_type::aggregate_task_type;
 
-    future_type<void> rv;
-    int nCnt = 0;
+    future_type<void> rv;    
     if(n_predecessors > 0) {
-	  int * queue_list = new int[n_predecessors];
-	  int queue_cnt[8] = {0,0,0,0,0,0,0,0};
+	  int valid_pred = 0;
+	  int pred_league_rank = team_scheduler_info().team_association;
 	  
       // Loop over the predecessors to find the queue and increment the reference
       // counts
@@ -731,6 +652,7 @@ public:
         auto* predecessor_task_ptr = predecessors[i_pred].m_task;
 
         if(predecessor_task_ptr != nullptr) {
+		  
           // TODO @tasking @cleanup DSH figure out when this is allowed to be nullptr (if at all anymore)
 
           // Increment reference count to track subsequent assignment.
@@ -742,10 +664,13 @@ public:
           // JSM -- this needs to have a way to get the scheduler from the predecesor task...
           // we will assume that the predecessor has the same scheduler ???
      
-          queue_list[i_pred] = mw_ptrtonodelet(predecessor_task_ptr);
-          queue_cnt[queue_list[i_pred]]++;
-        } else {
-            queue_list[i_pred] = -1;
+          valid_pred++;
+          int location  = mw_ptrtonodelet(predecessor_task_ptr);
+          if (location != pred_league_rank) {
+			  //printf("changing league rank for aggregate predecessor: %d - %d, %d \n", predecessor_task_ptr->node_id, location, pred_league_rank);
+			  pred_league_rank = location;
+		  }
+          
 		}
 
       } // end loop over predecessors
@@ -754,50 +679,37 @@ public:
       // This only represents a non-ready future if at least one of the predecessors
       // has a task (and thus, a queue)
 
-      for (int r = 0; r < 8; r++) {
-		  if(queue_cnt[r] > 0) {
-			 if (r != get_scheduler_node(NULL)) {
-				 printf("aggregates are not on the same queue as this scheduler instance %d, %d \n", get_scheduler_node(NULL), r );
-			 }
-             auto& q = *(_get_queue(r));
+      if (valid_pred > 0) {
+		 auto& q = queue();
 
-             //printf("constructing aggregate task for queue %d \n", r);
-             //fflush(stdout);
+		 //printf("constructing aggregate task for queue %d \n", r);
+		 //fflush(stdout);
 
-             auto* aggregate_task_ptr = q.template allocate_and_construct_with_vla_emulation<
-                 task_type, task_base_type*
-              >(
-               /* n_vla_entries = */ queue_cnt[r],
-               /* queue_ndx = */ r,
-               /* aggregate_predecessor_count = */ n_predecessors,
-               /* queue_base = */ &q,
-               /* initial_reference_count = */ 2
-               );
-        
-               //printf("future reference aggregate task \n");
-               //fflush(stdout);        
+		 auto* aggregate_task_ptr = q.template allocate_and_construct_with_vla_emulation<
+			 task_type, task_base_type* >(
+		   /* n_vla_entries = */ n_predecessors,
+		   /* queue_ndx = */ pred_league_rank,
+		   /* aggregate_predecessor_count = */ n_predecessors,
+		   /* queue_base = */ &q,
+		   /* initial_reference_count = */ 2
+		   );
+	
+		   //printf("future reference aggregate task \n");
+		   //fflush(stdout);        
 
-               rv = future_type<void>(aggregate_task_ptr);
+		   rv = future_type<void>(aggregate_task_ptr);
 
-               for(int i_pred = 0; i_pred < n_predecessors; ++i_pred) {
-				   if (queue_list[i_pred] == r) {
-			           //printf("adding predecessor to aggregate: %d, %d - %d, %d \n", r, i_pred, mw_ptrtonodelet(predecessors[i_pred].m_task), mw_ptrtonodelet(&q));
-			           //fflush(stdout);
-                       aggregate_task_ptr->vla_value_at(i_pred) = predecessors[i_pred].m_task;
-                    }
-                }
-                Kokkos::memory_fence(); // we're touching very questionable memory, so be sure to fence
+		   for(int i_pred = 0; i_pred < n_predecessors; ++i_pred) {
+			   //printf("Adding task to aggregate: %d <-- %d \n", aggregate_task_ptr->node_id, predecessors[i_pred].m_task->node_id);
+			   aggregate_task_ptr->vla_value_at(i_pred) = predecessors[i_pred].m_task;
+	       }
+		   Kokkos::memory_fence(); // we're touching very questionable memory, so be sure to fence
 
-                q.schedule_aggregate(std::move(*aggregate_task_ptr), team_scheduler_info());
-                 // the aggregate may be processed at any time, so don't touch it after this
-                nCnt++;
-            }            
+           q.schedule_aggregate(std::move(*aggregate_task_ptr), q.initial_team_scheduler_info(pred_league_rank));
+		   // the aggregate may be processed at any time, so don't touch it after this
          }
-         delete [] queue_list;
      }
-     // if the predecessors are on different queues...this will cause a problem.
-     if (nCnt > 1) printf("more than one future created...only returning one.\n");
-    return rv;
+     return rv;
   }
 
   template <class F>
@@ -819,16 +731,14 @@ public:
       std::is_base_of<scheduler_type, typename generated_type::scheduler_type>::value,
       "when_all function must return a Kokkos::BasicFuture of a compatible scheduler type"
     );
-
-    int queue_ndx = get_scheduler_node(NULL);
-    task_queue_type* queue = _get_queue(queue_ndx);
-    auto* aggregate_task = queue->template allocate_and_construct_with_vla_emulation<
+        
+    auto* aggregate_task = m_queue->template allocate_and_construct_with_vla_emulation<
       task_type, task_base_type*
     >(
       /* n_vla_entries = */ n_calls,
-      /* queue node = */ queue_ndx,
+      /* queue node = */ team_scheduler_info().team_association,
       /* aggregate_predecessor_count = */ n_calls,
-      /* queue_base = */ queue,
+      /* queue_base = */ m_queue,
       /* initial_reference_count = */ 2
     );
 
@@ -842,7 +752,7 @@ public:
         generated_future.m_task->increment_reference_count();
         aggregate_task->vla_value_at(i_call) = generated_future.m_task;
 
-        KOKKOS_ASSERT(queue == generated_future.m_task->ready_queue_base_ptr()
+        KOKKOS_ASSERT(m_queue == generated_future.m_task->ready_queue_base_ptr()
           && "Queue mismatch in when_all"
         );
       }
@@ -851,7 +761,7 @@ public:
 
     Kokkos::memory_fence();
 
-    queue->schedule_aggregate(std::move(*aggregate_task), team_scheduler_info());
+    m_queue->schedule_aggregate(std::move(*aggregate_task), team_scheduler_info());
     // This could complete at any moment, so don't touch anything after this
 
     return rv;
