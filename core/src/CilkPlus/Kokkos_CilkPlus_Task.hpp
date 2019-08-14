@@ -66,7 +66,6 @@ namespace Impl {
 template <class Scheduler>
 class TaskExec<Kokkos::Experimental::CilkPlus, Scheduler> {
  private:
-  enum { emu_league_size = 8 };
 
   TaskExec(TaskExec&&)      = delete;
   TaskExec(TaskExec const&) = delete;
@@ -94,8 +93,8 @@ class TaskExec<Kokkos::Experimental::CilkPlus, Scheduler> {
   int team_rank() const { return m_team_rank; }
   int team_size() const { return m_team_size; }
   int league_rank() const { return m_league_rank; }
-  int league_size() { return emu_league_size; }
-  static constexpr int max_league_size() { return emu_league_size; }
+  int league_size() { return NODELETS(); }
+  static constexpr int max_league_size() { return NODELETS(); }
 
   void team_barrier() const {
     if (1 < m_team_size) {
