@@ -168,6 +168,12 @@ long * EmuReplicatedSpace::getRefAddr()
 int EmuReplicatedSpace::memory_zones() 
 { return NODELETS(); }
 
+int EmuStridedSpace::memory_zones() 
+{ return NODELETS(); }
+
+int EmuLocalSpace::memory_zones() 
+{ return NODELETS(); }
+
 EmuStridedSpace::EmuStridedSpace()
 {
 }
@@ -587,7 +593,7 @@ custom_increment( Kokkos::Impl::SharedAllocationRecord<void,void>* pRec ) {
 void SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void >::
 custom_increment( Kokkos::Impl::SharedAllocationRecord<void,void>* pRec ) {
    for ( int i = 0; i < NODELETS(); i++) {
-  //    printf("increment count on node: %d\n", i);
+      //printf("increment count on node: %d\n", i);
       Kokkos::Impl::SharedAllocationRecord<void,void>* pL = (Kokkos::Impl::SharedAllocationRecord<void,void>*)mw_get_nth(pRec,i);
       Kokkos::atomic_fetch_add( & pL->m_count , 1 );
    }
@@ -674,8 +680,8 @@ SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void >::custom_d
    void* sd = pEmuHead->m_stridedData;
 
    for ( int i = 0; i < NODELETS(); i++) {
-   //   printf("decrement count on node: %d\n", i);
-    //  fflush(stdout);
+      //printf("decrement count on node: %d\n", i);
+      //fflush(stdout);
       Kokkos::Impl::SharedAllocationRecord<void,void>* pL = (Kokkos::Impl::SharedAllocationRecord<void,void>*)mw_get_nth(pRec,i);
       const int old_count = Kokkos::atomic_fetch_add( & pL->m_count , -1 );
    //   printf("count decremented on node: %d -> %d \n", i, old_count);

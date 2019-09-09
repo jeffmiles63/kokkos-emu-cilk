@@ -159,6 +159,8 @@ HostSpace::HostSpace( const HostSpace::AllocationMechanism & arg_alloc_mech )
   }
 }
 
+int HostSpace::memory_zones() { return 1; }
+
 void * HostSpace::allocate( const size_t arg_alloc_size ) const
 {
   static_assert( sizeof(void*) == sizeof(uintptr_t)

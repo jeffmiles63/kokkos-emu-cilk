@@ -565,8 +565,12 @@ public:
   
   accessor_strided( const accessor_strided & rhs) = default;
   accessor_strided & operator = ( const accessor_strided & rhs) = default;
-  accessor_strided( ) : block_size(1) {}
-  accessor_strided( const size_t b_ ) : block_size(b_) {}
+  accessor_strided( ) : block_size(1) {
+	      printf("strided accessor block = %d \n", block_size);
+	  }
+  accessor_strided( const size_t b_ ) : block_size(b_) {
+	    printf("strided accessor block = %d \n", block_size);
+	}
 
   constexpr typename offset_policy::pointer
     offset( pointer p , ptrdiff_t i ) const noexcept
@@ -600,7 +604,8 @@ public:
   accessor_replicated( const accessor_replicated & rhs) = default;
   accessor_replicated & operator = ( const accessor_replicated & rhs) = default;
   accessor_replicated( ) : block_size(1) {}
-  accessor_replicated( const size_t b_ ) : block_size(b_) {}
+  accessor_replicated( const size_t b_ ) : block_size(b_) {
+  }
 
   constexpr typename offset_policy::pointer
     offset( pointer p , ptrdiff_t i ) const noexcept
@@ -855,7 +860,8 @@ public:
   typedef basic_mdspan<typename traits::value_type, typename mdspan_extents< view_data_analysis >::md_extents,
                  typename mdspan_layout< traits >::md_layout, typename mdspan_accessor< traits >::md_accessor > mdspan_type;
                  
-  typedef typename mdspan_type::mapping_type   mapping_type;                 
+  typedef typename mdspan_type::mapping_type   mapping_type;
+  typedef typename mdspan_accessor< traits >::md_accessor accessor_type;
   
 private:
 
@@ -1057,18 +1063,17 @@ private:
 #endif
 
 public:
-#ifdef KOKKOS_ENABLE_DEPRECATED_CODE
+//#ifdef KOKKOS_ENABLE_DEPRECATED_CODE
    template< class ... Args >
-   KOKKOS_FORCEINLINE_FUNCTION
+   KOKKOS_FORCEINLINE_FUNCTION   
    typename std::enable_if<( Kokkos::Impl::are_integral<Args...>::value
-                             && ( 0 == Rank )
                            ), reference_type >::type
    operator()( Args ... args ) const
      {
        KOKKOS_IMPL_VIEW_OPERATOR_VERIFY( (m_track,m_map,args...) )
-       return m_map();
+       return m_map(args...);
      }
-
+/*
    template< typename I0
               , class ... Args>
    KOKKOS_FORCEINLINE_FUNCTION
@@ -1514,7 +1519,7 @@ public:
       KOKKOS_IMPL_VIEW_OPERATOR_VERIFY( (m_track,m_map,i0) )
       return m_map( i0 );
     }
-
+typename traits::memory_space
   template< typename I0 >
   KOKKOS_FORCEINLINE_FUNCTION
   typename std::enable_if<
@@ -1850,6 +1855,7 @@ public:
     }
 
 #endif
+* */
   template< class ... Args >
   KOKKOS_FORCEINLINE_FUNCTION
   typename std::enable_if<( Kokkos::Impl::are_integral<Args...>::value
@@ -2106,9 +2112,6 @@ public:
        return m_map(i0,i1,i2,i3,i4);
      }
 
-   //------------------------------
-   // Rank 6
-
    template< typename I0 , typename I1 , typename I2 , typename I3
            , typename I4 , typename I5
            , class ... Args >
@@ -2224,7 +2227,10 @@ public:
   // Standard destructor, constructors, and assignment operators
 
   KOKKOS_INLINE_FUNCTION
-  ~View() {}
+  ~View() {
+	  //printf("View Destructor: %s - %d \n", label().c_str(), m_track.use_count());
+	  //fflush(stdout);
+  }
 
   KOKKOS_INLINE_FUNCTION
   View() : m_track(), m_map() {}
@@ -2335,7 +2341,7 @@ public:
       record_type::allocate( ( (Kokkos::Impl::ViewCtorProp<void,memory_space> const &) arg_prop ).value
                            , ( (Kokkos::Impl::ViewCtorProp<void,std::string>  const &) arg_prop ).value
                            , alloc_size );
-
+    
     //printf("initializing deallocator... \n");
     //fflush(stdout);
 /*
@@ -2352,7 +2358,7 @@ public:
       // Construct values
       record->m_destroy.construct_shared_allocation();
 */
-//      printf("initialization complete \n");
+//      printf("view %s initialization complete \n", record->get_label().c_str());
 //      fflush(stdout);
 //    }
 
@@ -2441,7 +2447,53 @@ public:
       // Setup and initialization complete, start tracking
       m_track.assign_allocated_record_to_uninitialized( record );
       
+      // need to set the blocksize for these.
+      m_map.acc_ = get_updated_accessor<accessor_type>( );
+	  
       m_map.ptr_ = (pointer_type)record->data();
+    }
+    
+  template<class accessor_type>
+  KOKKOS_FORCEINLINE_FUNCTION
+  typename std::enable_if< (
+     ( std::is_same< accessor_type, accessor_strided< typename traits::value_type > >::value ) ||
+		  ( std::is_same< accessor_type, accessor_remote< typename traits::value_type > >::value ) ), accessor_type >::type
+  get_updated_accessor() {
+	  return accessor_type(get_block_size());
+  }
+  
+  template<class accessor_type>
+  KOKKOS_FORCEINLINE_FUNCTION
+  typename std::enable_if< (
+     ( ! std::is_same< accessor_type, accessor_strided< typename traits::value_type > >::value ) &&
+		 ! ( std::is_same< accessor_type, accessor_remote< typename traits::value_type > >::value ) ), accessor_type >::type
+  get_updated_accessor() {
+	  return accessor_type();
+  }
+
+  
+  KOKKOS_FORCEINLINE_FUNCTION
+  int get_block_size() const
+    {		
+		using mem_space = typename traits::memory_space;
+		int nReturn = mem_space::memory_zones();
+		if (is_layout_left) {
+			if (Rank >1) {		       
+		       nReturn = m_map.stride( Rank - 2 );
+		    } else if (Rank == 1) {
+			   nReturn = extent(0) / mem_space::memory_zones();
+			}
+			printf("layout left returning block size: Rank = %d, stride=%d \n", Rank, nReturn);
+	    }
+        else if (is_layout_right) {
+			if (Rank >1) {		       
+		       nReturn = m_map.stride( 0 );
+		    } else if (Rank == 1) {
+			   nReturn = extent(0) / mem_space::memory_zones();
+			}
+			printf("layout right returning block size: Rank = %d, stride=%d \n", Rank, nReturn);
+	    }
+        return nReturn;
     }
 
   KOKKOS_INLINE_FUNCTION
@@ -2450,6 +2502,7 @@ public:
       m_track.clear();
       m_map.ptr_ = arg_data;
     }
+
 
   // Wrap memory according to properties and array layout
   template< class ... P >

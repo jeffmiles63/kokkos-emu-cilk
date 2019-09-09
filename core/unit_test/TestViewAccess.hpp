@@ -8,8 +8,7 @@
 namespace Kokkos {
 namespace Experimental {
    extern void * ers;
-   extern replicated EmuReplicatedSpace els;
-   extern void initialize_memory_space();
+   extern replicated EmuReplicatedSpace els;   
 }}
 
 namespace test {
@@ -17,8 +16,7 @@ namespace test {
 template< class Scalar, class ExecSpace >
 void TestViewAccess( int N ) {
    //starttiming();
-   Kokkos::Experimental::initialize_memory_space();
-
+   
    Kokkos::View< Scalar*, Kokkos::HostSpace > hs_view( "host", N );
    printf ("host view size is %ld \n", (unsigned long)sizeof(hs_view));
    fflush(stdout);
@@ -37,10 +35,26 @@ void TestViewAccess( int N ) {
    Kokkos::parallel_for (N, KOKKOS_LAMBDA (int i) {
       hs_view(i) = i*3;
    } );
-   
+   Kokkos::fence();   
    for (int i = 0; i < N; i++) {
       ASSERT_EQ( cp_view(i), i*3 );
    }
+    
+
+   printf("Testing 2D view...\n");
+   fflush(stdout);   
+   Kokkos::View< Scalar**, Kokkos::HostSpace > dd_view( "2d view", 8, N );
+   //printf ("host view size is %ld \n", (unsigned long)sizeof(cp_view));
+   Kokkos::parallel_for (N, KOKKOS_LAMBDA (int i) {
+   //for (int i = 0; i < N; i++) {
+	   for (int r = 0; r < 8; r++) {
+         dd_view(r,i) = i*3 + r;
+	   }
+   }
+   );
+   Kokkos::fence();   
+   printf("host access test complete %d\n", N);
+   fflush(stdout);   
       
    
    Scalar total = 0;
@@ -54,7 +68,10 @@ void TestViewAccess( int N ) {
       //printf("[%d] finished updating %d\n", NODE_ID(), i);
 	  //fflush(stdout);	        
    }, total );
-    
+   Kokkos::fence();   
+   printf("parallel reduce test complete %d\n", N);
+   fflush(stdout);      
+   
 
 //   long * refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
 /*   for (int i = 0; i < Kokkos::Experimental::EmuReplicatedSpace::memory_zones(); i++) {
@@ -106,12 +123,12 @@ void TestViewAccess( int N ) {
       });
 //      }
    }
-   //Kokkos::fence();
+   Kokkos::fence();
    printf("Testing access to strided space view\n");
    fflush(stdout);
-   
+      
    {
-      Kokkos::View< Scalar*, Kokkos::Experimental::EmuStridedSpace > strided_space_view( "strided", N );   
+      Kokkos::View< Scalar*, Kokkos::Experimental::EmuStridedSpace > strided_space_view( "strided", N );
       printf ("strided view size is %ld \n", (unsigned long)sizeof(strided_space_view));
       fflush(stdout);
 
@@ -124,8 +141,25 @@ void TestViewAccess( int N ) {
       });
 //      }
    }
-   Kokkos::fence();
+   {
+      Kokkos::View< Scalar**, Kokkos::Experimental::EmuStridedSpace > strided_space_view( "2D strided", 8, N );
+      printf ("strided view size is %ld \n", (unsigned long)sizeof(strided_space_view));
+      fflush(stdout);
 
+      printf("updating strided space view\n");
+      fflush(stdout);
+
+      Kokkos::parallel_for(8, KOKKOS_LAMBDA (const int i) {
+         for (int r = 0; r < N; r++ ) {
+            strided_space_view(i,r) = (Scalar)i * 5 + r;
+		 }
+      });
+   }
+   
+   Kokkos::fence();
+   printf("Done Testing access to strided space view\n");
+   fflush(stdout);
+   
 }
 
 
@@ -133,6 +167,8 @@ void TestViewAccess( int N ) {
 TEST_F( TEST_CATEGORY, view_access )
 {
   TestViewAccess< long, TEST_EXECSPACE >( 128 );
+  TestViewAccess< long, TEST_EXECSPACE >( 8192 );
+  TestViewAccess< long, TEST_EXECSPACE >( 16 );
 }
 
 }

@@ -50,11 +50,20 @@
 
 #include <Kokkos_Core.hpp>
 
+namespace Kokkos {
+namespace Experimental {
+   extern void * ers;
+   extern replicated EmuReplicatedSpace els;
+   extern void initialize_memory_space();
+}}
+
+
 int main( int argc, char* argv[] )
 {
   printf("calling kokkos::initialize \n");
   Kokkos::initialize( argc, argv );
   {
+     Kokkos::Experimental::initialize_memory_space();	  
      printf("initializing tests...\n");
      testing::initialize_tests();
      fflush(stdout);

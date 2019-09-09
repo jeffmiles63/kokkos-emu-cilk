@@ -503,11 +503,17 @@ decrement( SharedAllocationRecord< void , void > * arg_record )
     arg_record->m_prev = 0 ;
 #endif
 
-//printf("calling dealloc functor");
-//fflush(stdout);
     function_type d = arg_record->m_dealloc ;
-    (*d)( arg_record );
-    arg_record = 0 ;
+    if (d != nullptr) {
+       //printf("calling dealloc functor: %s \n", arg_record->get_label().c_str());
+       //fflush(stdout);
+		
+       //(*d)( arg_record );
+       arg_record = 0 ;
+    } else {
+       //printf("record count is zero but there is nothing to deallocate: %s \n", arg_record->get_label().c_str());
+       //fflush(stdout);		
+	}
   }
   else if ( old_count < 1 ) { // Error
     fprintf(stderr,"Kokkos::Impl::SharedAllocationRecord '%s' failed decrement count = %d\n", arg_record->m_alloc_ptr->m_label , old_count );

@@ -140,6 +140,8 @@ public:
 
   /**\brief Return Name of the MemorySpace */
   static constexpr const char* name() { return m_name; }
+  
+  static int memory_zones();
 
 private:
   AllocationMechanism  m_alloc_mech;

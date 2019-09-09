@@ -104,6 +104,7 @@ public:
   static void access_error();
   static void access_error( const void * const );
   static void * local_root_record;
+  static int memory_zones();
 
 private:
   static constexpr const char* m_name = "EmuLocalSpace";
@@ -218,6 +219,8 @@ public:
   static void custom_increment( void * pRec );
 
   static void * custom_decrement( void * pRec );
+  
+  static int memory_zones();
 
   static void * ess;
   static void * strided_root_record;
