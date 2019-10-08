@@ -669,6 +669,11 @@ public:
       } // end allocation attempt loop
       //--------------------------------------------------------------------
       ATOMIC_SWAP(&m_sb_lock_array[add_info], 0);
+      
+      if (p == nullptr) {
+		  printf("Cannot allocate memory pool data of size: %d \n", alloc_size);
+		  fflush(stdout);
+	  }
 
       return p ;
     }

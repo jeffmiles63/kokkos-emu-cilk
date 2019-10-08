@@ -149,9 +149,9 @@ ifeq ($(KOKKOS_INTERNAL_USE_CILKPLUS), 1)
    else
         OBJ_CILKPLUS = UnitTestMainInit.o gtest-all.o
    endif
-        OBJ_CILKPLUS += TestCilkPlus_Init.o
-        OBJ_CILKPLUS += TestCilkPlus_SharedAlloc.o
-##        OBJ_CILKPLUS += TestCilkPlus_RangePolicy.o
+#        OBJ_CILKPLUS += TestCilkPlus_Init.o
+#        OBJ_CILKPLUS += TestCilkPlus_SharedAlloc.o
+        OBJ_CILKPLUS += TestCilkPlus_RangePolicy.o
 ##        OBJ_CILKPLUS += TestCilkPlus_ViewAPI_b.o
 ##        OBJ_CILKPLUS += TestCilkPlus_ViewMapping_a.o TestCilkPlus_ViewMapping_b.o TestCilkPlus_ViewMapping_subview.o
 ##        OBJ_CILKPLUS += TestCilkPlus_ViewOfClass.o

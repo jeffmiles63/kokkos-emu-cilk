@@ -566,10 +566,10 @@ public:
   accessor_strided( const accessor_strided & rhs) = default;
   accessor_strided & operator = ( const accessor_strided & rhs) = default;
   accessor_strided( ) : block_size(1) {
-	      printf("strided accessor block = %d \n", block_size);
+	      //printf("strided accessor block = %d \n", block_size);
 	  }
   accessor_strided( const size_t b_ ) : block_size(b_) {
-	    printf("strided accessor block = %d \n", block_size);
+	    //printf("strided accessor block = %d \n", block_size);
 	}
 
   constexpr typename offset_policy::pointer
@@ -660,6 +660,10 @@ public:
 
 struct comp_dimensions {
    typedef Impl::ViewArrayAnalysis< int > scalar ;
+   typedef Impl::ViewArrayAnalysis< int[2] > static_array1_2 ;
+   typedef Impl::ViewArrayAnalysis< int[3] > static_array1_3 ;
+   typedef Impl::ViewArrayAnalysis< int[4] > static_array1_4 ;
+   typedef Impl::ViewArrayAnalysis< int[5] > static_array1_5 ;
    typedef Impl::ViewArrayAnalysis< int* > array_10 ;
    typedef Impl::ViewArrayAnalysis< int** > array_20 ;
    typedef Impl::ViewArrayAnalysis< int*** > array_30 ;
@@ -671,6 +675,30 @@ struct comp_dimensions {
 
 template< class view_data_analysis, class enabled = void >
 struct mdspan_extents;
+
+template< class view_data_analysis >
+struct mdspan_extents<view_data_analysis, typename std::enable_if< std::is_same< typename view_data_analysis::static_dimension, comp_dimensions::static_array1_2::static_dimension >::value &&
+                                                          std::is_same< typename view_data_analysis::dynamic_dimension, comp_dimensions::static_array1_2::dynamic_dimension >::value >::type > {
+	typedef extents<2> md_extents;
+};
+
+template< class view_data_analysis >
+struct mdspan_extents<view_data_analysis, typename std::enable_if< std::is_same< typename view_data_analysis::static_dimension, comp_dimensions::static_array1_3::static_dimension >::value &&
+                                                          std::is_same< typename view_data_analysis::dynamic_dimension, comp_dimensions::static_array1_3::dynamic_dimension >::value >::type > {
+	typedef extents<3> md_extents;
+};
+
+template< class view_data_analysis >
+struct mdspan_extents<view_data_analysis, typename std::enable_if< std::is_same< typename view_data_analysis::static_dimension, comp_dimensions::static_array1_4::static_dimension >::value &&
+                                                          std::is_same< typename view_data_analysis::dynamic_dimension, comp_dimensions::static_array1_4::dynamic_dimension >::value >::type > {
+	typedef extents<4> md_extents;
+};
+
+template< class view_data_analysis >
+struct mdspan_extents<view_data_analysis, typename std::enable_if< std::is_same< typename view_data_analysis::static_dimension, comp_dimensions::static_array1_5::static_dimension >::value &&
+                                                          std::is_same< typename view_data_analysis::dynamic_dimension, comp_dimensions::static_array1_5::dynamic_dimension >::value >::type > {
+	typedef extents<5> md_extents;
+};
 
 template< class view_data_analysis >
 struct mdspan_extents<view_data_analysis, typename std::enable_if< std::is_same< typename view_data_analysis::static_dimension, comp_dimensions::scalar::static_dimension >::value &&
@@ -727,6 +755,38 @@ struct mdspan_mapping< mapping_type, extents_type, view_data_analysis, array_lay
                                                           std::is_same< typename view_data_analysis::dynamic_dimension, comp_dimensions::scalar::dynamic_dimension >::value >::type > {
 	
 	static constexpr mapping_type mapping(array_layout arg_layout) {  return mapping_type(); }
+ };
+ 
+template<class mapping_type, class extents_type, class view_data_analysis, class array_layout>
+struct mdspan_mapping< mapping_type, extents_type, view_data_analysis, array_layout, 
+                       typename std::enable_if< std::is_same< typename view_data_analysis::static_dimension, comp_dimensions::static_array1_2::static_dimension >::value &&
+                             std::is_same< typename view_data_analysis::dynamic_dimension, comp_dimensions::static_array1_2::dynamic_dimension >::value >::type > {
+	
+	static constexpr mapping_type mapping(array_layout arg_layout) {  return mapping_type(extents_type()); }
+ };
+ 
+template<class mapping_type, class extents_type, class view_data_analysis, class array_layout>
+struct mdspan_mapping< mapping_type, extents_type, view_data_analysis, array_layout, 
+                       typename std::enable_if< std::is_same< typename view_data_analysis::static_dimension, comp_dimensions::static_array1_3::static_dimension >::value &&
+                             std::is_same< typename view_data_analysis::dynamic_dimension, comp_dimensions::static_array1_3::dynamic_dimension >::value >::type > {
+	
+	static constexpr mapping_type mapping(array_layout arg_layout) {  return mapping_type(extents_type()); }
+ };
+ 
+ template<class mapping_type, class extents_type, class view_data_analysis, class array_layout>
+struct mdspan_mapping< mapping_type, extents_type, view_data_analysis, array_layout, 
+                       typename std::enable_if< std::is_same< typename view_data_analysis::static_dimension, comp_dimensions::static_array1_4::static_dimension >::value &&
+                             std::is_same< typename view_data_analysis::dynamic_dimension, comp_dimensions::static_array1_4::dynamic_dimension >::value >::type > {
+	
+	static constexpr mapping_type mapping(array_layout arg_layout) {  return mapping_type(extents_type()); }
+ };
+ 
+ template<class mapping_type, class extents_type, class view_data_analysis, class array_layout>
+struct mdspan_mapping< mapping_type, extents_type, view_data_analysis, array_layout, 
+                       typename std::enable_if< std::is_same< typename view_data_analysis::static_dimension, comp_dimensions::static_array1_5::static_dimension >::value &&
+                             std::is_same< typename view_data_analysis::dynamic_dimension, comp_dimensions::static_array1_5::dynamic_dimension >::value >::type > {
+	
+	static constexpr mapping_type mapping(array_layout arg_layout) {  return mapping_type(extents_type()); }
  };
  
 template<class mapping_type, class extents_type, class view_data_analysis, class array_layout>
@@ -792,6 +852,18 @@ struct mdspan_mapping< mapping_type, extents_type, view_data_analysis, array_lay
 
 template< class traits, class enabled = void >
 struct mdspan_accessor;
+
+template< class traits >
+struct mdspan_accessor< traits, typename std::enable_if< std::is_same< typename traits::memory_space,Kokkos::AnonymousSpace >::value &&
+                                                         std::is_same< typename traits::memory_traits,Kokkos::MemoryManaged >::value >::type > {
+	typedef accessor_basic< typename traits::value_type > md_accessor;
+};
+
+template< class traits >
+struct mdspan_accessor< traits, typename std::enable_if< std::is_same< typename traits::memory_space,Kokkos::AnonymousSpace >::value &&
+                                                         std::is_same< typename traits::memory_traits,Kokkos::MemoryUnmanaged >::value >::type > {
+	typedef accessor_basic< typename traits::value_type > md_accessor;
+};
 
 template< class traits >
 struct mdspan_accessor< traits, typename std::enable_if< std::is_same< typename traits::memory_space,Kokkos::HostSpace >::value &&
@@ -950,40 +1022,40 @@ public:
 
   //----------------------------------------
 
-  KOKKOS_INLINE_FUNCTION constexpr size_t size() const { return m_map.dimension_0() *
-                                                                m_map.dimension_1() *
-                                                                m_map.dimension_2() *
-                                                                m_map.dimension_3() *
-                                                                m_map.dimension_4() *
-                                                                m_map.dimension_5() *
-                                                                m_map.dimension_6() *
-                                                                m_map.dimension_7(); }
+  KOKKOS_INLINE_FUNCTION constexpr size_t size() const { return m_map.extent(0) *
+                                                                m_map.extent(1) *
+                                                                m_map.extent(2) *
+                                                                m_map.extent(3) *
+                                                                m_map.extent(4) *
+                                                                m_map.extent(5) *
+                                                                m_map.extent(6) *
+                                                                m_map.extent(7); }
 
-  KOKKOS_INLINE_FUNCTION constexpr size_t stride_0() const { return m_map.stride_0(); }
-  KOKKOS_INLINE_FUNCTION constexpr size_t stride_1() const { return m_map.stride_1(); }
-  KOKKOS_INLINE_FUNCTION constexpr size_t stride_2() const { return m_map.stride_2(); }
-  KOKKOS_INLINE_FUNCTION constexpr size_t stride_3() const { return m_map.stride_3(); }
-  KOKKOS_INLINE_FUNCTION constexpr size_t stride_4() const { return m_map.stride_4(); }
-  KOKKOS_INLINE_FUNCTION constexpr size_t stride_5() const { return m_map.stride_5(); }
-  KOKKOS_INLINE_FUNCTION constexpr size_t stride_6() const { return m_map.stride_6(); }
-  KOKKOS_INLINE_FUNCTION constexpr size_t stride_7() const { return m_map.stride_7(); }
+  KOKKOS_INLINE_FUNCTION constexpr size_t stride_0() const { return m_map.mapping().stride(0); }
+  KOKKOS_INLINE_FUNCTION constexpr size_t stride_1() const { return m_map.mapping().stride(1); }
+  KOKKOS_INLINE_FUNCTION constexpr size_t stride_2() const { return m_map.mapping().stride(2); }
+  KOKKOS_INLINE_FUNCTION constexpr size_t stride_3() const { return m_map.mapping().stride(3); }
+  KOKKOS_INLINE_FUNCTION constexpr size_t stride_4() const { return m_map.mapping().stride(4); }
+  KOKKOS_INLINE_FUNCTION constexpr size_t stride_5() const { return m_map.mapping().stride(5); }
+  KOKKOS_INLINE_FUNCTION constexpr size_t stride_6() const { return m_map.mapping().stride(6); }
+  KOKKOS_INLINE_FUNCTION constexpr size_t stride_7() const { return m_map.mapping().stride(7); }
 
   template< typename iType >
   KOKKOS_INLINE_FUNCTION constexpr
   typename std::enable_if< std::is_integral<iType>::value , size_t >::type
   stride(iType r) const {
-    return (r == 0 ? m_map.stride_0() :
-           (r == 1 ? m_map.stride_1() :
-           (r == 2 ? m_map.stride_2() :
-           (r == 3 ? m_map.stride_3() :
-           (r == 4 ? m_map.stride_4() :
-           (r == 5 ? m_map.stride_5() :
-           (r == 6 ? m_map.stride_6() :
-                     m_map.stride_7())))))));
+    return (r == 0 ? m_map.mapping().stride(0) :
+           (r == 1 ? m_map.mapping().stride(1) :
+           (r == 2 ? m_map.mapping().stride(2) :
+           (r == 3 ? m_map.mapping().stride(3) :
+           (r == 4 ? m_map.mapping().stride(4) :
+           (r == 5 ? m_map.mapping().stride(5) :
+           (r == 6 ? m_map.mapping().stride(6) :
+                     m_map.mapping().stride(7))))))));
   }
 
   template< typename iType >
-  KOKKOS_INLINE_FUNCTION void stride( iType * const s ) const { m_map.stride(s); }
+  KOKKOS_INLINE_FUNCTION void stride( iType * const s ) const { m_map.stride(*s); }
 
   //----------------------------------------
   // Range span is the span which contains all members.
@@ -993,17 +1065,17 @@ public:
 
   enum { reference_type_is_lvalue_reference = std::is_lvalue_reference< reference_type >::value };
 
-  KOKKOS_INLINE_FUNCTION constexpr size_t span() const { return m_map.span(); }
+  KOKKOS_INLINE_FUNCTION constexpr size_t span() const { return m_map.mapping().required_span_size(); }
 #ifdef KOKKOS_ENABLE_DEPRECATED_CODE
   // Deprecated, use 'span()' insteadcustom_increment
-  KOKKOS_INLINE_FUNCTION constexpr size_t capacity() const { return m_map.span(); }
+  KOKKOS_INLINE_FUNCTION constexpr size_t capacity() const { return m_map.mapping().required_span_size(); }
 #endif
-  KOKKOS_INLINE_FUNCTION bool span_is_contiguous() const { return m_map.span_is_contiguous(); }
+  KOKKOS_INLINE_FUNCTION bool span_is_contiguous() const { return m_map.mapping().is_contiguous(); }
   KOKKOS_INLINE_FUNCTION constexpr pointer_type data() const { return m_map.data(); }
 
 #ifdef KOKKOS_ENABLE_DEPRECATED_CODE
   // Deprecated, use 'span_is_contigous()' instead
-  KOKKOS_INLINE_FUNCTION constexpr bool   is_contiguous() const { return m_map.span_is_contiguous(); }
+  KOKKOS_INLINE_FUNCTION constexpr bool   is_contiguous() const { return m_map.mapping().is_contiguous(); }
   // Deprecated, use 'data()' instead
   KOKKOS_INLINE_FUNCTION constexpr pointer_type ptr_on_device() const { return m_map.data(); }
 #endif
@@ -2257,7 +2329,7 @@ typename traits::memory_space
   KOKKOS_INLINE_FUNCTION
   View( const View<RT,RP...> & rhs )
     : m_track( rhs.m_track , traits::is_managed )
-    , m_map(rhs.m_map)
+    , m_map(mdspan_type(rhs.m_map))
     {
     }
 
@@ -2296,7 +2368,8 @@ typename traits::memory_space
       static_assert( Kokkos::Impl::ViewMapping< traits , typename DstType::traits , typename traits::specialize >::is_assignable
         , "Subview construction requires compatible view and subview arguments" );
 
-      Mapping::assign( m_map, src_view.m_map, arg0 , args... );
+      m_map.ptr_ = &src_view( arg0, args... );
+      
     }
 
   //----------------------------------------
@@ -2333,7 +2406,7 @@ typename traits::memory_space
       ( m_map.mapping().required_span_size() * sizeof( typename traits::value_type ) );
     
     //long node_id = NODE_ID();
-    //printf("View allocating memory in space: %s - %d, %d  \n", memory_space::name(), alloc_size, node_id );
+    //printf("View allocating memory in space: %s - %d  \n", memory_space::name(), alloc_size );
     //fflush(stdout);
 
     // Create shared memory tracking record with allocate memory from the memory space
@@ -2443,10 +2516,13 @@ typename traits::memory_space
       }
 #endif
 //------------------------------------------------------------
-
+      //printf("assign allocation record \n");
+      //fflush(stdout);
       // Setup and initialization complete, start tracking
       m_track.assign_allocated_record_to_uninitialized( record );
       
+      //printf("updating accessor object \n");
+      //fflush(stdout);
       // need to set the blocksize for these.
       m_map.acc_ = get_updated_accessor<accessor_type>( );
 	  
@@ -2483,7 +2559,7 @@ typename traits::memory_space
 		    } else if (Rank == 1) {
 			   nReturn = extent(0) / mem_space::memory_zones();
 			}
-			printf("layout left returning block size: Rank = %d, stride=%d \n", Rank, nReturn);
+			//printf("layout left returning block size: Rank = %d, stride=%d \n", Rank, nReturn);
 	    }
         else if (is_layout_right) {
 			if (Rank >1) {		       
@@ -2491,7 +2567,7 @@ typename traits::memory_space
 		    } else if (Rank == 1) {
 			   nReturn = extent(0) / mem_space::memory_zones();
 			}
-			printf("layout right returning block size: Rank = %d, stride=%d \n", Rank, nReturn);
+			//printf("layout right returning block size: Rank = %d, stride=%d \n", Rank, nReturn);
 	    }
         return nReturn;
     }

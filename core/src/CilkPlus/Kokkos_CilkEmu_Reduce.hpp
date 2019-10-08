@@ -9,14 +9,11 @@
 namespace Kokkos {
 namespace Impl {
 
-static void * global_reducer = NULL;
-static void * global_reducer_local = NULL;
-
 template <class ReducerType>
-ReducerType * get_reducer(int refId) {
-   long * refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();   
-   ReducerType * pRet = (ReducerType *)mw_get_localto(global_reducer, &refPtr[refId]); 
-   return pRet;
+ReducerType * get_reducer(const void * ptr, int refId) {
+   ReducerType * pRet = (ReducerType *)mw_arrayindex((void*)ptr, refId, 
+                      Kokkos::Experimental::EmuReplicatedSpace::memory_zones(),  sizeof(ReducerType) ); 
+   return &pRet[0];
 }
 
 template <class ReduceWrapper, class ReducerType, class WorkTagFwd, class T = void>
@@ -34,33 +31,63 @@ struct CilkEmuReduceView<ReduceWrapper, ReducerType, WorkTagFwd, typename std::e
   typedef typename std::remove_pointer<nr_value_type>::type np_value_type;
   typedef typename std::remove_const<np_value_type>::type rd_value_type; 
   typedef Kokkos::Impl::FunctorValueJoin< ReducerType, WorkTagFwd >   ValueJoin;
+  typedef Kokkos::Impl::FunctorValueInit< ReducerType, WorkTagFwd >   ValueInit;
 
   rd_value_type & val;
 
 
 public:
   inline
-  CilkEmuReduceView( rd_value_type & val_ ) : val(val_) {
+  CilkEmuReduceView( const void * rp, int id, rd_value_type & val_ ) : val(val_) {
   }
 
   inline
-  void join( rd_value_type right ) {
-     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
+  void identity( const void * rp, int id, rd_value_type * val ) {
+     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
+     //printf("internal identity reduction value: %d, %lx, %d \n", id, ptr, *val);
+     //fflush(stdout);
      if (ptr)
      {
-//        printf("reducer view join (B): %ld, %ld \n", val, right);
-        ValueJoin::join( ptr->r, &val, &right );
-//        printf("reducer view join (A): %ld, %ld \n", val, right);
+        while (true) {
+           if (Impl::lock_addr((unsigned long)val)) {
+			   ValueInit::init( ptr->r, val );           
+               Impl::unlock_addr((unsigned long)val);
+               break;
+            }
+            Kokkos::Impl::emu_sleep((unsigned long)val);
+        }		         
      }  
+     //printf("after internal identity reduction value: %d, %lx, %d \n", id, ptr, *val);
+     //fflush(stdout);
+     
+  }
+
+
+  inline
+  void join( const void * rp, int id, rd_value_type right ) {
+     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
+     if (ptr)
+     {
+        while (true) {		 
+//        printf("reducer view join (B): %ld, %ld \n", val, right);
+           if (Impl::lock_addr((unsigned long)&val)) {
+			   ValueJoin::join( ptr->r, &val, &right );
+               Impl::unlock_addr((unsigned long)&val);
+               break;
+            }
+            Kokkos::Impl::emu_sleep((unsigned long)&val);
+        }
+//        printf("reducer view join (A): %ld, %ld \n", val, right);
+     }
   }
 
   inline
-  static rd_value_type create( rd_value_type val_ ) {
+  static rd_value_type create( int id, rd_value_type val_ ) {
      return val_;
   }
 
   inline 
-  static void destroy( rd_value_type val_ ) {
+  static void destroy( int id, rd_value_type val_ ) {
   }
 };
 
@@ -85,25 +112,30 @@ struct CilkReduceContainer<ReduceWrapper, ReducerType, WorkTagFwd, typename std:
   typedef rd_value_type ElementType;
 
   inline
-  void identity( rd_value_type * val )
+  void identity( const void * rp, int id, rd_value_type * val )
   {
-     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
+	 //printf("Reduce container identity: %d \n", id);
+	 //fflush(stdout);
+     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {
         ValueInit::init( ptr->r, val );
-//        printf("reducer init: %ld \n", *val);
+        //printf("reducer init: %ld \n", *val);
      }
   }
 
 
   inline
-  void reduce( rd_value_type * left, rd_value_type const * right )
+  void reduce( const void * rp, int id, rd_value_type * left, rd_value_type const * right )
   {
-     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
+	 //printf("Reduce container reduce: %d \n", id);
+	 //fflush(stdout);
+	  
+     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {
-//        printf("reducer reduce: %ld, %ld \n", *left, *right);
-//        ValueJoin::join( ptr->r, left, right );
+        //printf("[%d] reducer reduce: %ld, %ld \n", id, *left, *right);
+        ValueJoin::join( ptr->r, left, right );
      }
   }
 
@@ -121,6 +153,7 @@ struct CilkEmuReduceView<ReduceWrapper, ReducerType, WorkTagFwd, typename std::e
   typedef typename std::remove_const<ne_value_type>::type rd_value_type; 
 
   typedef Kokkos::Impl::FunctorValueJoin< ReducerType, WorkTagFwd >   ValueJoin;
+  typedef Kokkos::Impl::FunctorValueInit< ReducerType, WorkTagFwd >   ValueInit;
 
   rd_value_type * val;
 
@@ -128,9 +161,9 @@ public:
   // need to allocate space for val as it is just a pointer, then 
   // copy *val_ 
   inline
-  CilkEmuReduceView( rd_value_type * val_ ) {
+  CilkEmuReduceView( const void * rp, int id, rd_value_type * val_ ) {
      //printf("array view constructor: %08x \n", val_);
-     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
+     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {        
         Kokkos::HostSpace space;
@@ -140,10 +173,20 @@ public:
         val = val_;
      }
   }
+  
+  inline
+  void identity( const void * rp, int id, rd_value_type * val )
+  {
+     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
+     if (ptr)
+     {
+        ValueInit::init( ptr->r, val );
+     }
+  }  
 
   inline
-  void join( rd_value_type * right ) {
-     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
+  void join( const void * rp, int id, rd_value_type * right ) {
+     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {
         //printf("(B) array view join (P): %ld, %ld: %08x, %08x \n", val[0], right[0], val, right);
@@ -153,9 +196,9 @@ public:
   }
 
   inline
-  static rd_value_type * create( rd_value_type * val_ ) {     
+  static rd_value_type * create( const void * rp, int id, rd_value_type * val_ ) {     
      rd_value_type * lVal = 0;
-     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
+     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {        
         Kokkos::HostSpace space;
@@ -169,9 +212,9 @@ public:
   }
 
   inline 
-  static void destroy( rd_value_type * val_ ) {
+  static void destroy( const void * rp, int id, rd_value_type * val_ ) {
      //printf("array view destroy: %08x \n", val_);
-     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
+     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {        
         Kokkos::HostSpace space;
@@ -180,8 +223,6 @@ public:
   }
 
   inline ~CilkEmuReduceView() {
-     if (val) CilkEmuReduceView::destroy(val);
-     val = NULL;
   }
 
 };
@@ -207,9 +248,12 @@ struct CilkReduceContainer<ReduceWrapper, ReducerType, WorkTagFwd, typename std:
   size_t alloc_bytes;
 
   inline
-  void identity( rd_value_type * val )
+  void identity( const void * rp, int id, rd_value_type * val )
   {
-     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
+ 	 //printf("Reduce container identity: %d \n", id);
+	 //fflush(stdout);
+
+     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {
         ValueInit::init( ptr->r, val );
@@ -217,10 +261,13 @@ struct CilkReduceContainer<ReduceWrapper, ReducerType, WorkTagFwd, typename std:
   }
 
   inline
-  void reduce( rd_value_type * left, rd_value_type const * right )
+  void reduce( const void * rp, int id, rd_value_type * left, rd_value_type const * right )
   {
+	 printf("Reduce container reduce: %d \n", id);
+	 fflush(stdout);
+	  
      //printf("array reduce : %ld, %ld, %08x %08x \n", left[0], right[0], left, right);
-     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
+     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {
         ValueJoin::join( ptr->r, left, right );
@@ -240,31 +287,61 @@ struct CilkEmuReduceView<ReduceWrapper, ReducerType, WorkTagFwd, typename std::e
   typedef typename std::remove_pointer<nr_value_type>::type np_value_type;
   typedef typename std::remove_const<np_value_type>::type rd_value_type; 
   typedef Kokkos::Impl::FunctorValueJoin< ReducerType, WorkTagFwd >   ValueJoin;
+  typedef Kokkos::Impl::FunctorValueInit< ReducerType, WorkTagFwd >  ValueInit;
 
   rd_value_type & val;
 
 public:
   inline
-  CilkEmuReduceView( rd_value_type & val_ ) : val(val_) {
+  CilkEmuReduceView( const void * rp, int id, rd_value_type & val_ ) : val(val_) {
+	  //printf("[%d] init reducer view: %lx \n", id, &val);
   }
 
   inline
-  void join( rd_value_type right ) {
-     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
+  void identity( const void * rp, int id, rd_value_type * val )
+  {
+     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {
-//        printf("reducer view join (S): %ld, %ld \n", val.value[0], right.value[0]);
-        ValueJoin::join( ptr->r, &val, &right );
+        while (true) {
+           if (Impl::lock_addr((unsigned long)val)) {
+			   ValueInit::init( ptr->r, val );
+               Impl::unlock_addr((unsigned long)val);
+               break;
+            }
+            Kokkos::Impl::emu_sleep((unsigned long)val);
+        }			         
+     } else {
+		 //printf("[%d] identity cannot get reducer ptr \n", id);
+		 //fflush(stdout);
+     }
+  }
+  
+  inline
+  void join( const void * rp, int id, rd_value_type right ) {
+     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
+     if (ptr)
+     {
+        //printf("[%d] reducer view join (%lx): %d, %d \n", id, &val, val, right);
+        //fflush(stdout);
+        while (true) {
+           if (Impl::lock_addr((unsigned long)&val)) {			   
+			   ValueJoin::join( ptr->r, &val, &right );
+               Impl::unlock_addr((unsigned long)&val);
+               break;
+            }
+            Kokkos::Impl::emu_sleep((unsigned long)&val);
+        }			                 
      }  
   }
 
   inline
-  static rd_value_type create( rd_value_type val_ ) {
+  static rd_value_type create( const void * rp, int id, rd_value_type val_ ) {
      return val_;
   }
 
   inline 
-  static void destroy( rd_value_type val_ ) {
+  static void destroy( const void * rp, int id, rd_value_type val_ ) {
   }
 
 };
@@ -288,9 +365,12 @@ struct CilkReduceContainer<ReduceWrapper, ReducerType, WorkTagFwd, typename std:
   typedef Kokkos::Impl::FunctorValueInit< ReducerType, WorkTagFwd >  ValueInit;
 
   inline
-  void identity( rd_value_type * val )
+  void identity( const void * rp, int id, rd_value_type * val )
   {
-     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
+	 //printf("Reduce container identity: %d \n", id);
+	 //fflush(stdout);
+
+     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {
         ValueInit::init( ptr->r, val );
@@ -298,13 +378,16 @@ struct CilkReduceContainer<ReduceWrapper, ReducerType, WorkTagFwd, typename std:
   }
 
   inline
-  void reduce( rd_value_type * left, rd_value_type const * right )
+  void reduce( const void * rp, int id, rd_value_type * left, rd_value_type const * right )
   {
-//     printf("reducer - reduce (S): %ld, %ld \n", (*left).value[0], (*right).value[0]);
-     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(NODE_ID());
+	 //printf("Reduce container reduce: %d \n", id);
+	 //fflush(stdout);
+
+     //printf("reducer - reduce (S): %ld, %ld [%d] \n", (*left).value[0], (*right).value[0], id);
+     ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {
-//        ValueJoin::join( ptr->r, left, right );
+        ValueJoin::join( ptr->r, left, right );
      }
   }
 
@@ -316,19 +399,24 @@ class NodeletReducer : public cilk::reducer<Mon> {
     // The underlying type. 
     typedef typename Mon::ElementType T;
     typedef typename Mon::ViewType View;
+    int m_id;
     T myElt;
     View myView;
 
 public:
-    NodeletReducer(T initVal):myElt(initVal),myView(myElt) {
+    NodeletReducer(const void * rp_, int id, const T * initVal): m_id(id), myElt(*initVal),myView(rp_, id, *initVal) {
+	}
+    NodeletReducer(const void * rp_, int id, T initVal): m_id(id), myElt(initVal),myView(rp_, id, myElt) {
+		//printf("NR: %d - %d \n", id, myElt);
+		//fflush(stdout);
     }
 
     ~NodeletReducer() {}
 
     T get_value() {
-        Mon mono; 
+        //Mon mono; 
         T reduced = myElt;
-        mono.reduce(&reduced, &(this->myElt));
+        //mono.reduce(m_id, &reduced, &(this->myElt));
         return reduced;
     }
 
@@ -373,19 +461,28 @@ struct kokkos_cilk_reducer< ReducerType, Functor, defaultType, WorkTagFwd , type
                                            Kokkos::is_view<ReducerType>::value, Functor, ReducerType>::type, 
                                                            WorkTagFwd >    ValueInit;
 
-    local_reducer_type * local_reducer = NULL;
-
+    
+    const int m_id;
     const ReducerType f;
     const ReducerType r;
     const size_t alloc_bytes;
+    local_reducer_type * local_reducer = NULL;
+    const void * global_reducer = NULL;
 
-    kokkos_cilk_reducer (const ReducerType & f_, const size_t l_alloc_bytes, void * ptr_reducer) :
-                      f(f_), alloc_bytes(l_alloc_bytes), local_reducer(reinterpret_cast<local_reducer_type *>(ptr_reducer)) {        
+    kokkos_cilk_reducer (const void * gr_, const int id, const ReducerType & f_, const size_t l_alloc_bytes, void * ptr_reducer) :
+                      m_id(id), f(f_), r(f_), alloc_bytes(l_alloc_bytes), 
+                      local_reducer(reinterpret_cast<local_reducer_type *>(ptr_reducer)),
+                      global_reducer(gr_) {        
     }
 
+    void init( typename ReducerTypeFwd::value_type & ret ) {
+        typename reduce_container::ViewType * cont = local_reducer->view();
+        cont->identity( global_reducer, m_id, &ret );
+    }  
+   
     void join(typename ReducerTypeFwd::value_type & val_) {
         typename reduce_container::ViewType * cont = local_reducer->view();
-        cont->join( val_ );
+        cont->join( global_reducer, m_id, val_ );
     }
 
     void update_value(typename ReducerTypeFwd::value_type & ret) {
@@ -411,27 +508,49 @@ struct kokkos_cilk_reducer< ReducerType, Functor, defaultType, WorkTagFwd , type
                                                                          std::is_same< typename lambda_only< Functor >::type, void >::value  >::type > {
 
     typedef CilkReduceContainer< kokkos_cilk_reducer, Kokkos::Experimental::Sum< defaultType >, void >   reduce_container;
+    
+    typedef Kokkos::Experimental::Sum< defaultType > ReducerTypeFwd;
 
-    typedef Kokkos::Impl::FunctorValueJoin< Kokkos::Experimental::Sum< defaultType >, WorkTagFwd >  ValueJoin;
-    typedef Kokkos::Impl::FunctorValueInit< Kokkos::Experimental::Sum< defaultType >, WorkTagFwd >  ValueInit;
+    typedef Kokkos::Impl::FunctorValueJoin< ReducerTypeFwd, WorkTagFwd >  ValueJoin;
+    typedef Kokkos::Impl::FunctorValueInit< ReducerTypeFwd, WorkTagFwd >  ValueInit;
     typedef cilk::reducer < reduce_container > local_reducer_type;
 
+    const int m_id;
     defaultType local_value;
     const Functor f;
     const Kokkos::Experimental::Sum< defaultType > r;
     const size_t alloc_bytes;
     
     local_reducer_type * local_reducer = NULL;
+    const void * global_reducer = NULL;
 
-    kokkos_cilk_reducer (const Functor & f_, const size_t l_alloc_bytes, void * ptr_reducer) : local_value(0), f(f_), 
-                                                                           r(local_value), alloc_bytes(l_alloc_bytes),
-                                                                           local_reducer(reinterpret_cast<local_reducer_type *>(ptr_reducer)) {
-        //printf("constructing default scalar reducer (sum), size = %d , addr = %08x\n", (int)l_alloc_bytes, (unsigned long)this );                   
+    kokkos_cilk_reducer (const void * gr_, const int id, const Functor & f_, const size_t l_alloc_bytes, void * ptr_reducer) : m_id(id), 
+                                                                           local_value(0), 
+                                                                           f(f_), 
+                                                                           r(local_value), 
+                                                                           alloc_bytes(l_alloc_bytes),
+                                                                           local_reducer(reinterpret_cast<local_reducer_type *>(ptr_reducer)), 
+                                                                           global_reducer(gr_) {
+        //printf("constructing default scalar reducer (sum), size = %d , addr = %08x\n", (int)l_alloc_bytes, (unsigned long)this );        
+        ValueInit::init( r, &local_value );
+        //defaultType test_val;
+        //update_value(test_val);
+        //printf("[%d] local reducer init value: %d\n", id, test_val);
+        //fflush(stdout);
     }
+    
+   void init( defaultType & ret ) {	    
+        typename reduce_container::ViewType * cont = local_reducer->view();
+        //printf("init reduction value: %lx, %d \n", cont, ret);
+        //fflush(stdout);
+        cont->identity( global_reducer, m_id, &ret );
+   }    
 
     void join(defaultType & val_) {
-        typename reduce_container::ViewType * cont = local_reducer->view();
-        cont->join( val_ );
+        typename reduce_container::ViewType * cont = local_reducer->view();        
+        cont->join( global_reducer, m_id, val_ );
+        //printf("cilk reducer join: %d, %d \n", m_id, val_);
+        //fflush(stdout);
     }
 
     void update_value(defaultType & ret) {
@@ -442,7 +561,10 @@ struct kokkos_cilk_reducer< ReducerType, Functor, defaultType, WorkTagFwd , type
     }
     
     static defaultType default_value() {
-		return defaultType();
+		defaultType val;
+		Kokkos::Experimental::Sum< defaultType > r_(val);
+        ValueInit::init( r_, &val );		
+		return val;
     }
 
 
@@ -457,22 +579,29 @@ struct kokkos_cilk_reducer< ReducerType, Functor, defaultType, WorkTagFwd , type
 
     typedef CilkReduceContainer< kokkos_cilk_reducer, Functor, WorkTagFwd > reduce_container;
     typedef cilk::reducer < reduce_container > local_reducer_type;
+    typedef Functor ReducerTypeFwd;
     typedef Kokkos::Impl::FunctorValueJoin< Functor, WorkTagFwd >   ValueJoin;
     typedef Kokkos::Impl::FunctorValueInit< Functor, WorkTagFwd >  ValueInit;
   
+    const int m_id;
     const Functor f;
     const Functor r;
     size_t alloc_bytes;
 
     typename reduce_container::rd_value_type * lVal = NULL;
     local_reducer_type * local_reducer = NULL;
+    const void * global_reducer = NULL;
 
 //    inline
 //    kokkos_cilk_reducer & operator = ( const kokkos_cilk_reducer & rhs ) { 
 //       f = rhs.f ; alloc_bytes = rhs.alloc_bytes ; lVal = rhs.lVal ; local_reducer = rhs.local_reducer ; return *this ; }
 
-    kokkos_cilk_reducer (const Functor & f_, const size_t l_alloc_bytes, void* ptr_reducer) : f(f_), r(f_), alloc_bytes(l_alloc_bytes),
-                                                                           local_reducer(reinterpret_cast<local_reducer_type *>(ptr_reducer)) {
+    kokkos_cilk_reducer (const void * gr_, const int id, const Functor & f_, const size_t l_alloc_bytes, void* ptr_reducer) : m_id(id), 
+                                                                           f(f_), r(f_), alloc_bytes(l_alloc_bytes),
+                                                                           local_reducer(reinterpret_cast<local_reducer_type *>(ptr_reducer)),
+                                                                           global_reducer(gr_) {
+        //printf("constructing reducer for array %d \n", id);
+																			   
         uint64_t myRed = (long) mw_ptr0to1(this);
         this->lVal = (typename reduce_container::rd_value_type *)mw_localmalloc( l_alloc_bytes, (void*)myRed );
 
@@ -481,12 +610,15 @@ struct kokkos_cilk_reducer< ReducerType, Functor, defaultType, WorkTagFwd , type
         ValueInit::init( this->f, this->lVal );
     }
 
+   void init( typename reduce_container::rd_value_type * ret ) {
+        typename reduce_container::ViewType * cont = local_reducer->view();
+        cont->identity( global_reducer, m_id, ret );
+   }
+   
     void join(typename reduce_container::rd_value_type * val_) {
-        //printf("reducer join: %ld\n", (long)NODE_ID());
-        //fflush(stdout);
         
         typename reduce_container::ViewType * cont = local_reducer->view();
-        cont->join( val_ );
+        cont->join( global_reducer, m_id, val_ );
     }
 
     void update_value(typename reduce_container::rd_value_type * ret) {
@@ -497,11 +629,11 @@ struct kokkos_cilk_reducer< ReducerType, Functor, defaultType, WorkTagFwd , type
     void release_resources() {
     }
     
-    static typename Functor::value_type default_value() {
+    static typename reduce_container::rd_value_type default_value() {
         typename Functor::value_type lVal;
         Functor f_;
         ValueInit::init( f_, &lVal );
-        return lVal;		
+        return static_cast<typename reduce_container::rd_value_type>(lVal);
 	}
     
 };
@@ -516,22 +648,35 @@ struct kokkos_cilk_reducer< ReducerType, Functor, defaultType, WorkTagFwd , type
 
     typedef CilkReduceContainer< kokkos_cilk_reducer, ReducerType, WorkTagFwd > reduce_container;
     typedef cilk::reducer < reduce_container > local_reducer_type;
+    typedef Functor ReducerTypeFwd;
     typedef Kokkos::Impl::FunctorValueJoin< Functor, WorkTagFwd >  ValueJoin;
     typedef Kokkos::Impl::FunctorValueInit< Functor, WorkTagFwd >  ValueInit;
 
-    local_reducer_type * local_reducer = NULL;
-
+    const int m_id;
     const Functor f;
     const Functor r;
     const size_t alloc_bytes;
+    local_reducer_type * local_reducer = NULL;    
+    const void * global_reducer= NULL;
 
-    kokkos_cilk_reducer (const Functor & f_, const size_t l_alloc_bytes, void * ptr_reducer) : f(f_), r(f_), alloc_bytes(l_alloc_bytes),
-                                                                           local_reducer(reinterpret_cast<local_reducer_type *>(ptr_reducer)) {        
+    kokkos_cilk_reducer (const void * gr_, const int id, const Functor & f_, const size_t l_alloc_bytes, void * ptr_reducer) : m_id(id), 
+                                                                           f(f_), r(f_), alloc_bytes(l_alloc_bytes),
+                                                                           local_reducer(reinterpret_cast<local_reducer_type *>(ptr_reducer)),
+                                                                           global_reducer(gr_) {
+		typename Functor::value_type  test_val;
+		update_value(test_val);
+		//printf("[%d] cilk reducer (with functor) init val = %d \n", id, test_val);
+		//fflush(stdout);
     }
+
+   void init( typename Functor::value_type & ret ) {
+        typename reduce_container::ViewType * cont = local_reducer->view();
+        cont->identity( global_reducer, m_id, &ret );
+   }
 
    void join(typename Functor::value_type & val_) {
         typename reduce_container::ViewType * cont = local_reducer->view();
-        cont->join( val_ );
+        cont->join( global_reducer, m_id, val_ );
     }
     
     void update_value(typename Functor::value_type & ret) {

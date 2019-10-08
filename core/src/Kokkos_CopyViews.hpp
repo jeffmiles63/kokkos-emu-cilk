@@ -1481,7 +1481,7 @@ void deep_copy
        (src.extent(7) != dst.extent(7))
      ) {
 #ifdef KOKKOS_ENABLE_DEPRECATED_CODE
-    Kokkos::fence();
+/*    Kokkos::fence();
     if ( DstExecCanAccessSrc ) {
       // Copying data between views in accessible memory spaces and either non-contiguous or incompatible shape.
       Kokkos::Impl::ViewRemap< dst_type , src_type >( dst , src );
@@ -1493,7 +1493,7 @@ void deep_copy
     else {
       Kokkos::Impl::throw_runtime_exception("deep_copy given views that would require a temporary allocation");
     }
-    Kokkos::fence();
+    Kokkos::fence();*/
     return;
 #else
     std::string message("Deprecation Error: Kokkos::deep_copy extents of views don't match: ");

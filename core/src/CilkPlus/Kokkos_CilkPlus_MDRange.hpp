@@ -89,6 +89,9 @@ private:
   const Policy        m_policy ;
   const ReducerType   m_reducer ;
   const pointer_type  m_result_ptr ;
+  
+  void * global_reducer = NULL;
+  void * local_reducer = NULL;  
 
   inline
   void
@@ -116,6 +119,7 @@ private:
       cilk_reducer.update_value( update );
       cilk_reducer.release_resources();
       global_reducer = NULL;
+      local_reducer = NULL;
       if (w_ptr != NULL) {
           //printf("freeing memory: %d \n", working_set);
           space.deallocate(w_ptr, working_set);

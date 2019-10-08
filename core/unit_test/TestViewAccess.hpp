@@ -18,8 +18,8 @@ void TestViewAccess( int N ) {
    //starttiming();
    
    Kokkos::View< Scalar*, Kokkos::HostSpace > hs_view( "host", N );
-   printf ("host view size is %ld \n", (unsigned long)sizeof(hs_view));
-   fflush(stdout);
+//   printf ("host view size is %ld \n", (unsigned long)sizeof(hs_view));
+//   fflush(stdout);
 
    for (int i = 0; i < N; i++) {
 //	  printf("testing host access: %d\n", i);
@@ -57,24 +57,25 @@ void TestViewAccess( int N ) {
    fflush(stdout);   
       
    
+   
    Scalar total = 0;
    Kokkos::parallel_reduce (N, KOKKOS_LAMBDA (int i, Scalar& update) {
 	  //printf("[%d] inside reduce functor %d\n", NODE_ID(), i);
 	  //fflush(stdout);
-	  Scalar upd = hs_view(i);
+	  //Scalar upd = hs_view(i);
 	  //printf("[%d] updating reduce var %d, %ld\n", NODE_ID(), i, upd);
 	  //fflush(stdout);	  
-      update += upd;
+      update += 1;
       //printf("[%d] finished updating %d\n", NODE_ID(), i);
 	  //fflush(stdout);	        
    }, total );
    Kokkos::fence();   
-   printf("parallel reduce test complete %d\n", N);
+   printf("parallel reduce test complete %d\n", total);
    fflush(stdout);      
    
-
+/*
 //   long * refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
-/*   for (int i = 0; i < Kokkos::Experimental::EmuReplicatedSpace::memory_zones(); i++) {
+   for (int i = 0; i < Kokkos::Experimental::EmuReplicatedSpace::memory_zones(); i++) {
       MIGRATE(&refPtr[i]);
 //      Kokkos::View< Scalar*, Kokkos::Experimental::EmuLocalSpace > local_space_view( Kokkos::ViewAllocateWithoutInitializing("local"), N );
       Kokkos::View< Scalar*, Kokkos::Experimental::EmuLocalSpace > local_space_view( "local", N );      
@@ -91,9 +92,9 @@ void TestViewAccess( int N ) {
       fflush(stdout);
    }
    printf("local memory view test complete\n");
-*/
 
-/*
+
+
    {
       Kokkos::View< Scalar*, Kokkos::Experimental::EmuReplicatedSpace > replicated_space_view( "replicated", N );   
       printf ("replicated view size is %ld \n", (unsigned long)sizeof(replicated_space_view));
@@ -104,13 +105,13 @@ void TestViewAccess( int N ) {
          replicated_space_view(i) = (Scalar)i;
       });
    }
- */
+*/ 
    
    
    Kokkos::fence();
    {
       Kokkos::View< Scalar*, Kokkos::HostSpace, Kokkos::MemoryTraits<Kokkos::ForceRemote> > global_space_view( "global", N );
-      printf ("global view size is %ld \n", (unsigned long)sizeof(global_space_view));
+//      printf ("global view size is %ld \n", (unsigned long)sizeof(global_space_view));
 //      Kokkos::View< Scalar*, Kokkos::HostSpace, Kokkos::MemoryTraits<0> > global_space_view( "global", N );      
 
 
@@ -124,13 +125,15 @@ void TestViewAccess( int N ) {
 //      }
    }
    Kokkos::fence();
+  
    printf("Testing access to strided space view\n");
    fflush(stdout);
-      
+   
+   for (int r = 0; r < 1; r++) 
    {
       Kokkos::View< Scalar*, Kokkos::Experimental::EmuStridedSpace > strided_space_view( "strided", N );
-      printf ("strided view size is %ld \n", (unsigned long)sizeof(strided_space_view));
-      fflush(stdout);
+//      printf ("strided view size is %ld \n", (unsigned long)sizeof(strided_space_view));
+//      fflush(stdout);
 
       printf("updating strided space view\n");
       fflush(stdout);
@@ -141,10 +144,12 @@ void TestViewAccess( int N ) {
       });
 //      }
    }
+   
+   
    {
       Kokkos::View< Scalar**, Kokkos::Experimental::EmuStridedSpace > strided_space_view( "2D strided", 8, N );
-      printf ("strided view size is %ld \n", (unsigned long)sizeof(strided_space_view));
-      fflush(stdout);
+//      printf ("strided view size is %ld \n", (unsigned long)sizeof(strided_space_view));
+//      fflush(stdout);
 
       printf("updating strided space view\n");
       fflush(stdout);
@@ -157,8 +162,8 @@ void TestViewAccess( int N ) {
    }
    
    Kokkos::fence();
-   printf("Done Testing access to strided space view\n");
-   fflush(stdout);
+//   printf("Done Testing access to strided space view\n");
+//   fflush(stdout);
    
 }
 

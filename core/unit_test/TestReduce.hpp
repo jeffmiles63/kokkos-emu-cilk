@@ -56,9 +56,13 @@ class ReduceFunctor
 public:
   typedef DeviceType execution_space;
   typedef typename execution_space::size_type size_type;
+  ReduceFunctor () : nwork(0) {}
 
   struct value_type {
     ScalarType value[3];
+    
+    value_type() { value[0] = 0; value[1] = 0; value[2] = 0; }
+    value_type(const ScalarType v) { value[0] = v; value[1] = v; value[2] = v; }
   };
 
   const size_type nwork;
@@ -103,6 +107,10 @@ template< class DeviceType >
 class ReduceFunctorFinal : public ReduceFunctor< long, DeviceType > {
 public:
   typedef typename ReduceFunctor< long, DeviceType >::value_type value_type;
+
+  KOKKOS_INLINE_FUNCTION
+  ReduceFunctorFinal( )
+    : ReduceFunctor< long, DeviceType >( 0 ) {}
 
   KOKKOS_INLINE_FUNCTION
   ReduceFunctorFinal( const size_t n )
@@ -267,6 +275,8 @@ public:
                                       : ( nw / 2 ) * ( nw + 1 );
 
     for ( unsigned i = 0; i < Repeat; ++i ) {
+	  printf("calling parallel_reduce %d \n", nwork);
+	  fflush(stdout);
       Kokkos::parallel_reduce( nwork, functor_type( nwork ), result[i] );
     }
 
@@ -484,7 +494,7 @@ TEST_F( TEST_CATEGORY, double_reduce )
   TestReduce< double, TEST_EXECSPACE >( 0 );
   TestReduce< double, TEST_EXECSPACE >( 1000000 );
 }
-
+/*
 TEST_F( TEST_CATEGORY, long_reduce_dynamic )
 {
   TestReduceDynamic< long, TEST_EXECSPACE >( 0 );
@@ -502,5 +512,5 @@ TEST_F( TEST_CATEGORY, long_reduce_dynamic_view )
   TestReduceDynamicView< long, TEST_EXECSPACE >( 0 );
   TestReduceDynamicView< long, TEST_EXECSPACE >( 1000000 );
 }
-
+*/
 } // namespace Test

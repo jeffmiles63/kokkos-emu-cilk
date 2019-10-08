@@ -49,6 +49,8 @@
 #include <impl/Kokkos_TaskQueue.hpp>
 #include <impl/Kokkos_HostThreadTeam.hpp>
 
+#define MAX_TEAM_SIZE 64
+//#define DEBUG_QUEUE_CNT
 
 namespace Kokkos {
 	
@@ -136,20 +138,20 @@ public:
   
   using queue_type = typename scheduler_type::task_queue_type; 
   using task_base_type = typename queue_type::task_base_type;  
-  static const int layer_width = 8;
+  static const int layer_width = MAX_TEAM_SIZE;
   
   static
   void iff_single_thread_recursive_execute( scheduler_type const& scheduler ) {    
     
   }
 
-  static void launch_task( void * ptr, int offset, int i, int n, scheduler_type const& scheduler, long* data_ref) {
+  static void launch_task( void * ptr, int lr, int tr, scheduler_type const& scheduler, long* data_ref) {
 	  task_base_type * task_ptr = (task_base_type *)ptr;
 //	  printf("inside task thread %d, %d : %08x \n", i, n, task_ptr);
 //	  fflush(stdout);
         	  
 	  auto& queue = scheduler.queue();    
-      member_type member(scheduler, n, layer_width, i);
+      member_type member(scheduler, tr, layer_width, lr);
 	  
 	  if ( task_ptr ) {
 		  		  
@@ -187,7 +189,7 @@ public:
 //      printf("head [%d] entering queue processing loop %d \n", i , team_scheduler.team_scheduler_info().team_association);
 //	  fflush(stdout);      
            
-      int n = 0;
+      int n = 0;  // team_rank
       while ( true ) {
 		  
  		  //printf("head [%d] looking for task %d \n", i, n );
@@ -204,14 +206,11 @@ public:
 		  	 
 		  	 void* ptr = (void*)current_task.get();
              
-		     cilk_spawn_at(ptr) launch_task( ptr, offset, i, n, team_scheduler, data_ref ); 
+		     cilk_spawn_at(ptr) launch_task( ptr, i, n, team_scheduler, data_ref ); 
 		     n = n+1;
 		     if (n > layer_width) {
-				 offset = layer_width * i;
 				 n=0;
-			 }		     
-		     // need to set offset once n > layer width...
-
+			 }
 	      }
 	      
 	      if ( team_queue.is_done(i) && all_queues_are_done(scheduler) ) {
@@ -221,8 +220,8 @@ public:
 	    
  	  }
  	  cilk_sync;
-// 	  printf("exit head task loop: %d - %d \n", i, n);
- 	  //fflush(stdout);
+ 	  printf("exit head task loop: %d - %d \n", i, n);
+ 	  fflush(stdout);
   }
   
   static bool all_queues_are_done(scheduler_type const& scheduler) {
@@ -273,8 +272,7 @@ public:
 
     long * data_ref = mw_malloc1dlong(NODELETS());
 
-    int offset = 0;
-    // blocks of 64 ... for now.  if the queue doesn't have 64, then they should all just return...
+    int offset = 0;    
     for ( int i = 0; i < NODELETS(); i++ ) {
        cilk_spawn_at(&data_ref[i]) team_task_head( offset, i, scheduler, data_ref );
     }
@@ -371,8 +369,7 @@ public:
 
     int offset = 0;
     while(not queue.is_done()) {
-
-       // blocks of 64 ... for now.  if the queue doesn't have 64, then they should all just return...
+       
        for ( int i = 0; i < NODELETS(); i++ ) {
           cilk_spawn_at(&data_ref[i]) launch_task( offset, 1, i, scheduler, data_ref );
        }

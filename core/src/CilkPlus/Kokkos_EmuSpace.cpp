@@ -117,8 +117,8 @@ namespace Experimental {
 	
 	
 void print_pointer( int i, void* ptr, const char * name ) {
-    emu_pointer pchk = examine_emu_pointer(ptr);
-    printf("'%s-%d' st: %ld, view: %ld \n", name, i, pchk.nodelet_id, pchk.view);
+    //emu_pointer pchk = examine_emu_pointer(ptr);
+    //printf("'%s-%d' st: %ld, view: %ld \n", name, i, pchk.nodelet_id, pchk.view);
 }
 
 void EmuLocalSpace::access_error()
@@ -228,6 +228,9 @@ void * EmuReplicatedSpace::allocate( const size_t arg_alloc_size ) const
 
   // created replicated 
   ptr = (void*)mw_mallocrepl(arg_alloc_size);
+  
+  //printf("Replicated space allocated %lx, %d \n", ptr, arg_alloc_size);
+  //fflush(stdout);
 
   return ptr ;
 }
@@ -239,6 +242,8 @@ void * EmuStridedSpace::allocate( const size_t arg_alloc_size ) const
   size_t tcnt = NODELETS();
   size_t depth = ( arg_alloc_size / tcnt ) + sizeof(double);
   ptr = (void*)mw_malloc2d( tcnt, depth );
+  //printf("strided space memory allocated: %d, %d, %lx \n", tcnt, depth, ptr);
+  //fflush(stdout);
 
   return ptr ;
 }
@@ -390,7 +395,7 @@ void local_stride_alloc (int i, void * vr, void * vh, void * vd, const char * ar
    Kokkos::Experimental::strided_shared_rec::RecordBase* rb = (Kokkos::Experimental::strided_shared_rec::RecordBase*)
                                                                mw_get_nth(Kokkos::Experimental::EmuStridedSpace::strided_root_record, i);
 
-   new (pRec) Kokkos::Experimental::strided_shared_rec( rb, arg_label, arg_alloc_size, pH, vd, (int)NODE_ID() );  // each replica of the record/header points to the same memory head.
+   new (pRec) Kokkos::Experimental::strided_shared_rec( rb, arg_label, arg_alloc_size, pH, vd, i );  // each replica of the record/header points to the same memory head.
 }	
 SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void > *
 SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void >::
@@ -739,12 +744,14 @@ SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void >::custom_d
   if (bFreeMemory) {
 	 //printf("strided calling free memory ...\n");
 	 //fflush(stdout);
+	 
      Kokkos::Experimental::EmuStridedSpace* pMem = ((Kokkos::Experimental::EmuStridedSpace*)mw_ptr1to0(Kokkos::Experimental::EmuStridedSpace::ess));
      Kokkos::Experimental::EmuReplicatedSpace* pRepl = ((Kokkos::Experimental::EmuReplicatedSpace*)mw_ptr1to0(Kokkos::Experimental::EmuReplicatedSpace::ers));
      if (sd != nullptr) {
         pMem->deallocate(sd, 0);
      }
      pRepl->deallocate(mw_ptr1to0(pRec), sizeof(SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void >));
+     
   }
 
   return pRec;
