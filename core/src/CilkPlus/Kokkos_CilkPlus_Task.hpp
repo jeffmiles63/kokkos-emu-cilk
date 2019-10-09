@@ -180,8 +180,8 @@ public:
 
   
   static void team_task_head(int offset, int i, scheduler_type const& scheduler, long* data_ref) {
-//	  printf("team task head: %d, %d, %d.  \n", offset, i );
-//	  fflush(stdout);
+	  printf("team task head: %d, %d, %d.  \n", offset, i );
+	  fflush(stdout);
 	  	  	  	  
       auto team_scheduler = scheduler.get_team_scheduler(i);
       auto& team_queue = team_scheduler.queue();
@@ -223,6 +223,27 @@ public:
  	  printf("exit head task loop: %d - %d \n", i, n);
  	  fflush(stdout);
   }
+  
+  static void print_ready_queue_count(scheduler_type const& scheduler) {
+	  char readyList[25];
+	  for (int i = 0; i < member_type::max_league_size(); i++ ) {
+ 		  readyList[i*3+0] =  0x30;
+		  readyList[i*3+1] =  0x30;
+		  readyList[i*3+2] =  0x30;		  
+	  }
+	  for ( int i = 0; i < member_type::max_league_size(); i++ ) {
+		  int nReady = scheduler.queue().team_ready_count(i);
+		  int hundreds = (nReady / 100);
+		  int tens = (nReady - (hundreds * 100)) / 10;
+		  int ones = nReady - (tens * 10);
+		  readyList[i*3+0] =  hundreds + 0x30;
+		  readyList[i*3+1] = tens + 0x30;
+		  readyList[i*3+2] = ones + 0x30;		  
+	  }
+	  readyList[24] = 0;
+	  printf("check queues [%s] \n", readyList );
+	  fflush(stdout);
+  }  
   
   static bool all_queues_are_done(scheduler_type const& scheduler) {
 	  bool bAllDone = true;
@@ -276,7 +297,10 @@ public:
     for ( int i = 0; i < NODELETS(); i++ ) {
        cilk_spawn_at(&data_ref[i]) team_task_head( offset, i, scheduler, data_ref );
     }
-    cilk_sync;       
+    cilk_sync;
+    printf("returning from exec: %s \n", all_queues_are_done(scheduler) ? "true" : "false");
+    fflush(stdout);
+    print_ready_queue_count(scheduler);
     
   }
   
