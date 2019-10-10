@@ -180,7 +180,7 @@ public:
 
   
   static void team_task_head(int offset, int i, scheduler_type const& scheduler, long* data_ref) {
-	  printf("team task head: %d, %d, %d.  \n", offset, i );
+	  printf("team task head: %d, %d  \n", offset, i );
 	  fflush(stdout);
 	  	  	  	  
       auto team_scheduler = scheduler.get_team_scheduler(i);
@@ -188,9 +188,10 @@ public:
       
 //      printf("head [%d] entering queue processing loop %d \n", i , team_scheduler.team_scheduler_info().team_association);
 //	  fflush(stdout);      
-           
+      
       int n = 0;  // team_rank
       while ( true ) {
+		 int nStatusCounter = 0;
          while ( true ) {
 		  
  		    //printf("head [%d] looking for task %d \n", i, n );
@@ -213,6 +214,13 @@ public:
 				   n=0;
 			   }
 	        } else {	
+			   nStatusCounter++;
+			   
+			   if (nStatusCounter > 10000) {
+				   nStatusCounter = 0;
+				   printf("task head %d has been waiting a while with nothing to do %d of %d...\n", i, n, get_current_node_count());
+				   print_ready_queue_count(scheduler);
+			   }
 			   // only check this if the pop ready task returned nothing...      
 	           if ( team_queue.is_done(i) && all_queues_are_done(scheduler) ) {
 			     break;

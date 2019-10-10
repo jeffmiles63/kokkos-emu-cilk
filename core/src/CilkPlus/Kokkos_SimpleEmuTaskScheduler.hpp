@@ -298,6 +298,11 @@ public:
   const typename Impl::TaskResult< ValueType >::reference_type
   get() const
   {
+    if ( !is_ready() ) {
+		printf("task isn't ready when asked for result: %d \n ", m_task->node_id);
+		fflush(stdout);
+	}
+	  
     KOKKOS_EXPECTS(is_ready());
     //printf("returning future of ready task: %d \n", m_task->node_id);
     //fflush(stdout);

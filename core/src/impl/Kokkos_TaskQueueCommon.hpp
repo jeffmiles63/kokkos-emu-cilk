@@ -315,6 +315,7 @@ public:
 	int pred_id = -1;
     bool task_is_ready = true;
     bool scheduling_info_updated = false;
+    bool predecessor_not_ready = false;
 
     // do this before enqueueing and potentially losing exclusive access to task
     bool task_is_respawning = task.get_respawn_flag();
@@ -342,7 +343,7 @@ public:
       // Try to add the task to the predecessor's waiting queue.  If it fails,
       // the predecessor is already done
       //printf("schedule runnable adding task to predecessor wait queue %d <- %d \n", predecessor.node_id, task.node_id);
-      bool predecessor_not_ready = predecessor.try_add_waiting(task);
+      predecessor_not_ready = predecessor.try_add_waiting(task);
       //printf("schedule runnable adding task to predecessor wait queue %d <- %d, ready = %s \n", predecessor.node_id, task.node_id, 
       //   (not predecessor_not_ready) ? "true" : "false" );
 
@@ -411,6 +412,7 @@ public:
 	  }
 	  fflush(stdout);
     } else {
+	   KOKKOS_EXPECTS(predecessor_not_ready);
 		//printf("schedule runnable ending without really doing anything %d, pred is probably an aggr  %d ...\n", task.node_id, pred_id);
 	}
 
@@ -476,9 +478,9 @@ public:
         // If adding the aggregate to the waiting queue succeeds, the predecessor is not
         // complete
         bool pred_not_ready = predecessor_ptr->try_add_waiting(aggregate);
-//        printf("adding aggregate %d to predecessor wait queue %d: pred ready = %s\n", aggregate.node_id, predecessor_ptr->node_id, 
-//                                (not pred_not_ready) ? "true" : "false"  );
-//        fflush(stdout);
+        //printf("adding aggregate %d to predecessor wait queue %d: pred ready = %s\n", aggregate.node_id, predecessor_ptr->node_id, 
+        //                        (not pred_not_ready) ? "true" : "false"  );
+        //fflush(stdout);
 
         // NOTE! At this point it is unsafe to access aggregate (unless the
         // enqueueing failed, so we can't use move semantics to expire it)

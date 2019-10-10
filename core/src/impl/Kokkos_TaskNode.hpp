@@ -317,7 +317,7 @@ public:
   KOKKOS_INLINE_FUNCTION
   bool try_add_waiting(task_base_type& depends_on_this) {
 	//printf("adding task to wait queue %d <-- %d \n", node_id, depends_on_this.node_id);
-    return m_wait_queue.try_push(depends_on_this);    
+    return m_wait_queue.push_if_not_consumed(depends_on_this);    
   }
 
   template <class Function>

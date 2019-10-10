@@ -83,12 +83,12 @@ struct LockBasedLIFOCommon
   OwningRawPtr<node_type> m_head = (node_type*)EndTag;
 
   KOKKOS_INLINE_FUNCTION
-  bool _try_push_node(node_type& node) {
+  bool _try_push_node(node_type& node, const bool bLock = true) {
     KOKKOS_EXPECTS(!node.is_enqueued());
     
     // lock the queue
     //printf("update queue lock II: %08x \n", &(this->queue_lock) );
-    long test_lock = Kokkos::atomic_compare_exchange(&(this->queue_lock), (long)0, (long)1);
+    long test_lock = bLock ? Kokkos::atomic_compare_exchange(&(this->queue_lock), (long)0, (long)1) : 0;
 
     if( test_lock == 0) {
        auto* volatile & next = LinkedListNodeAccess::next_ptr(node);		
@@ -101,7 +101,8 @@ struct LockBasedLIFOCommon
        this->curQueueCnt++;
        
        // unlock the queue
-       ::Kokkos::atomic_exchange(&(this->queue_lock), 0);
+       if (bLock)
+          ::Kokkos::atomic_exchange(&(this->queue_lock), 0);
 
        //printf("update head: %08x, queue cnt = %d \n", this->m_head, this->curQueueCnt);
        //fflush(stdout);    
@@ -365,16 +366,39 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   bool is_consumed() const noexcept {
+	return (this->m_head == (node_type*)ConsumedTag);
+  }
+  
+  KOKKOS_INLINE_FUNCTION
+  bool push_if_not_consumed(node_type& node) {
+	bool bReturn = false;
+    long test_lock = -1;
+    while (test_lock != 0) {
+	   if (is_consumed()) {
+		   return false;
+	   }
+       test_lock = Kokkos::atomic_compare_exchange(&(this->queue_lock), (long)0, (long)1);
+       RESCHEDULE();
+    }
+    if( test_lock == 0) {	  
+		if (this->m_head == (node_type*)ConsumedTag) {
+			bReturn = false;
+		} else {
+			bReturn = this->_try_push_node(node, false);
+		}
+		
+		// unlock the queue
+       ::Kokkos::atomic_exchange(&(this->queue_lock), 0);
+    }
+		
     // TODO @tasking @memory_order DSH memory order?
-    return this->m_head == (node_type*)ConsumedTag;
+    return bReturn;
   }
 
   KOKKOS_INLINE_FUNCTION
   bool try_push(node_type& node)
   {
-	  if (this->m_head == (node_type*)ConsumedTag)
-	     return false;
-	
+	  KOKKOS_EXPECTS(!node.is_enqueued());
 	  //printf("try push onto single consume queue: 0x%lx - %d, 0x%lx - %d \n", 
 	  //   &node, mw_ptrtonodelet(&node), &(this->m_head), mw_ptrtonodelet(&(this->m_head)) );
       return this->_try_push_node(node);
@@ -396,7 +420,11 @@ public:
     // lock the queue
     //printf("update queue lock II: %08x \n", &(this->queue_lock) );
     //fflush(stdout);
-    long test_lock = Kokkos::atomic_compare_exchange(&(this->queue_lock), (long)0, (long)1);
+    long test_lock = -1;
+    while (test_lock != 0) {
+       test_lock = Kokkos::atomic_compare_exchange(&(this->queue_lock), (long)0, (long)1);
+       RESCHEDULE();
+    }
 
     if( test_lock == 0) {
 	   //printf("queue lock II obtained: %08x \n", &(this->queue_lock) );
