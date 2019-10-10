@@ -44,9 +44,9 @@
 #include <Kokkos_Core.hpp>
 
 #if defined(KOKKOS_ENABLE_EMU)
-   #include <memoryweb/memoryweb.h>
-   #include <memoryweb/repl.h>
-   #include <memoryweb/pmanip.h>   
+   #include <memoryweb.h>
+   #include <repl.h>
+   #include <pmanip.h>   
 #endif
 
 namespace Kokkos {

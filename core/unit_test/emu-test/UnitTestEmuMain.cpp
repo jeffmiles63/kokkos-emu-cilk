@@ -47,6 +47,7 @@
 #include <sys/time.h>
 #include <streamimport.h>
 #include <emu-test.h>
+#include <memoryweb.h>
 
 #include <Kokkos_Core.hpp>
 

@@ -508,6 +508,10 @@ public:
         // it into the predecessor list, so decrement it here
         bool should_delete = predecessor_ptr->decrement_and_check_reference_count();
         if(should_delete) {
+		  if (incomplete_dependence_found) {
+			  printf("[%d] We have been told to delete task after incomplete dependence found.  This may be a problem \n", predecessor_ptr_ref->node_id);
+			  fflush(stdout);
+		  }
           // TODO @tasking @cleanup DSH better encapsulation of this!
           _self().deallocate(std::move(*predecessor_ptr));
         }

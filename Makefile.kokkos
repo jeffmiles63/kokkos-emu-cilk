@@ -1102,8 +1102,8 @@ ifeq ($(KOKKOS_INTERNAL_USE_CILKPLUS), 1)
   ifeq ($(KOKKOS_INTERNAL_COMPILER_INTEL), 1)
     KOKKOS_CPPFLAGS += -fcilkplus
   else
-    KOKKOS_CPPFLAGS += -fcilkplus
-    KOKKOS_LIBS += -lcilkrts
+    ##KOKKOS_CPPFLAGS += -fcilkplus
+    ##KOKKOS_LIBS += -lcilkrts
   endif
 endif
 

@@ -49,9 +49,10 @@
 
 #include <Kokkos_Core_fwd.hpp>
 #include <cilk/cilk.h>
-#include <memoryweb/memory.h>
-#include <memoryweb/intrinsics.h>
-#include <memoryweb/repl.h>
+#include <memory.h>
+#include <intrinsics.h>
+#include <repl.h>
+#include <pmanip.h>
 #include <Kokkos_HostSpace.hpp>
 
 /*--------------------------------------------------------------------------*/

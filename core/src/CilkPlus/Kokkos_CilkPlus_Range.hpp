@@ -7,7 +7,8 @@
    #include<CilkPlus/Kokkos_CilkPlus_Reduce.hpp>
 #endif
 #include <cilk/cilk.h>
-#include <memoryweb/memory.h>
+#include <memory.h>
+#include <pmanip.h>
 
 //#define KOKKOS_CILK_USE_PARALLEL_FOR
 #define MAX_THREAD_COUNT 32

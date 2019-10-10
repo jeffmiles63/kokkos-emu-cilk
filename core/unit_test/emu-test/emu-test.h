@@ -44,7 +44,7 @@ protected:
    class GET_CLASS_NAME(category,unit_test) : public ::testing::Test { \
    public:\
    GET_CLASS_NAME(category,unit_test)();\
-   static testing::Test* const test_info_;\
+   static const testing::Test* test_info_;\
    virtual void test_body();\
 };\
 inline \
@@ -52,7 +52,7 @@ GET_CLASS_NAME(category,unit_test)::GET_CLASS_NAME(category,unit_test)() : ::tes
    m_Name = (std::string)GET_TEST_STRING(unit_test);\
    m_Category = (std::string)GET_TEST_STRING(category); \
 }\
-testing::Test* const GET_CLASS_NAME(category,unit_test)\
+const testing::Test* GET_CLASS_NAME(category,unit_test)\
   ::test_info_ =\
     testing::MakeAndRegisterTestInfo(new GET_CLASS_NAME(category,unit_test)());\
 \

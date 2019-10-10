@@ -4,7 +4,8 @@
 
 #include <cilk/cilk.h>
 #include <cilk/reducer.h>
-#include <memoryweb/intrinsics.h>
+#include <intrinsics.h>
+#include <pmanip.h>
 
 namespace Kokkos {
 namespace Impl {

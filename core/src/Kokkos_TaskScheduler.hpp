@@ -705,6 +705,8 @@ host_spawn(
     TaskEnum == Impl::TaskType::TaskTeam || TaskEnum == Impl::TaskType::TaskSingle,
     "Kokkos host_spawn requires TaskTeam or TaskSingle"
   );
+  
+  Kokkos::Impl::set_current_task_count(0);  
 
   // May be spawning a Cuda task, must use the specialization
   // to query on-device function pointer.

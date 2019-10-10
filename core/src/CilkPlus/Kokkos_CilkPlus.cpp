@@ -58,10 +58,23 @@ namespace Kokkos {
 namespace Impl {
 
 static int next_node_id = 0;
+static int current_node_cnt = 0;
 	
 extern int get_next_node_id() {
 	//return Kokkos::atomic_fetch_add( &next_node_id, 1 );
 	return next_node_id++;
+}
+
+extern void update_current_task_count( int val ) {
+	current_node_cnt += val;
+}
+
+extern void set_current_task_count( int val ) {
+	current_node_cnt = val;
+}
+
+extern int get_current_node_count() {
+	return current_node_cnt;
 }
 
 namespace {

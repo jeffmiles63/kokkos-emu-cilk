@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include <limits>
 #include <math.h>
+#include <memoryweb.h>
 
 #include <Kokkos_Core.hpp>
 

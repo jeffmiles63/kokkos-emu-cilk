@@ -49,6 +49,9 @@
 #include <cassert>
 #include <sys/time.h>
 
+static int task_cnt = 0;
+static int spawn_cnt = 0;
+
 //==============================================================================
 
 // Use this to estimate the size of the memory pool for a fibonacci problem with
@@ -89,12 +92,15 @@ struct FibonacciTask
   explicit
   FibonacciTask(int num) noexcept
     : n(num)
-  { // printf("constructing new fib task: %d \n", n); 
+  { 
+	  Kokkos::atomic_fetch_add( &task_cnt, 1 );
+	  // printf("constructing new fib task: %d \n", n); 
   }
 
   template <class TeamMember>
   KOKKOS_INLINE_FUNCTION
   void operator()(TeamMember& member, int& result) {
+	Kokkos::atomic_fetch_add( &spawn_cnt, 1 );
 	//printf("Task operator: [%d %d], [%d %d]\n", member.league_rank(), member.team_rank(), n, result);
 	//fflush(stdout);
     auto& scheduler = member.scheduler();
@@ -166,6 +172,8 @@ namespace Test {
       // wait on all tasks submitted to the scheduler to be done
       Kokkos::wait(scheduler);
     }
+    
+    printf(" Fib task count = %d, spawn count = %d \n", task_cnt, spawn_cnt);
 
     // Output results
     if(!result.is_null() && result.is_ready()) {

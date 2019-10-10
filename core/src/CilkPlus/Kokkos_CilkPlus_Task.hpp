@@ -191,37 +191,51 @@ public:
            
       int n = 0;  // team_rank
       while ( true ) {
+         while ( true ) {
 		  
- 		  //printf("head [%d] looking for task %d \n", i, n );
-		  //fflush(stdout);
-		  auto current_task = OptionalRef<task_base_type>(nullptr);
-          current_task = team_queue.pop_ready_task(team_scheduler.team_scheduler_info());
+ 		    //printf("head [%d] looking for task %d \n", i, n );
+		    //fflush(stdout);
+		    auto current_task = OptionalRef<task_base_type>(nullptr);
+            current_task = team_queue.pop_ready_task(team_scheduler.team_scheduler_info());
 
-          //printf("[%d] task head returned from pop_ready_task - %d \n", i, mw_ptrtonodelet(current_task.get()));
-          //fflush(stdout);
+            //printf("[%d] task head returned from pop_ready_task - %d \n", i, mw_ptrtonodelet(current_task.get()));
+            //fflush(stdout);
 	  
-	      if ( current_task.get() != nullptr ) {
-		   	 //printf("head [%d] launching task thread %d : %08x \n", i, n, current_task.get());
-		  	 //fflush(stdout);
+	        if ( current_task.get() != nullptr ) {
+		   	   //printf("head [%d] launching task thread %d : %08x \n", i, n, current_task.get());
+		  	   //fflush(stdout);
 		  	 
-		  	 void* ptr = (void*)current_task.get();
+		  	   void* ptr = (void*)current_task.get();
              
-		     cilk_spawn_at(ptr) launch_task( ptr, i, n, team_scheduler, data_ref ); 
-		     n = n+1;
-		     if (n > layer_width) {
-				 n=0;
-			 }
-	      }
-	      
-	      if ( team_queue.is_done(i) && all_queues_are_done(scheduler) ) {
-			  break;
-		  }
-	      RESCHEDULE();
+		       cilk_spawn_at(ptr) launch_task( ptr, i, n, team_scheduler, data_ref ); 
+		       n = n+1;
+		       if (n > layer_width) {
+				   n=0;
+			   }
+	        } else {	
+			   // only check this if the pop ready task returned nothing...      
+	           if ( team_queue.is_done(i) && all_queues_are_done(scheduler) ) {
+			     break;
+		       }
+		    }
+	        RESCHEDULE();
 	    
- 	  }
- 	  cilk_sync;
- 	  printf("exit head task loop: %d - %d \n", i, n);
- 	  fflush(stdout);
+ 	    }
+ 	    cilk_sync;
+        
+        // double check queues after synchronizing with all of the threads...
+	    if ( all_queues_are_done(scheduler) ) {
+		   break;
+		} else {
+			printf("[%d] team task head inner loop exited, but all queues aren't done \n", i);
+			fflush(stdout);
+			RESCHEDULE();
+		}
+		
+	 }
+ 	    
+ 	 printf("exit head task loop: %d - %d \n", i, n);
+ 	 fflush(stdout);
   }
   
   static void print_ready_queue_count(scheduler_type const& scheduler) {
@@ -298,7 +312,7 @@ public:
        cilk_spawn_at(&data_ref[i]) team_task_head( offset, i, scheduler, data_ref );
     }
     cilk_sync;
-    printf("returning from exec: %s \n", all_queues_are_done(scheduler) ? "true" : "false");
+    printf("returning from exec: %s , %d \n", all_queues_are_done(scheduler) ? "true" : "false", get_current_node_count());
     fflush(stdout);
     print_ready_queue_count(scheduler);
     

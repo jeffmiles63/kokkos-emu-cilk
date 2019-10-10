@@ -71,6 +71,10 @@ namespace Kokkos {
 namespace Impl {
 	
 extern int get_next_node_id();
+extern void update_current_task_count( int val );
+extern void set_current_task_count( int val );
+extern int get_current_node_count();
+
 
 enum TaskType : int16_t   { TaskTeam = 0 , TaskSingle = 1 , Aggregate = 2, TaskSpecial = -1 };
 
@@ -80,7 +84,7 @@ enum TaskType : int16_t   { TaskTeam = 0 , TaskSingle = 1 , Aggregate = 2, TaskS
  *
  *  @warning Memory pools assume that the address of this class is the same
  *           as the address of the most derived type that was allocated to
- *           have the given size.  As a consequence, when interacting with
+ *           have the given size.  As a conseq1uence, when interacting with
  *           multiple inheritance, this must always be the first base class
  *           of any derived class that uses it!
  *  @todo Consider inverting inheritance structure to avoid this problem?
@@ -218,6 +222,7 @@ public:
       m_is_respawning(false), 
       node_id( Kokkos::Impl::get_next_node_id() )
   { 
+	  update_current_task_count(1);
 	  //printf("task node created: %d\n", node_id);
   }
 
@@ -461,6 +466,10 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   int32_t dependence_count() const { return this->n_vla_entries(); }
+  
+  ~AggregateTask() {
+	  update_current_task_count(-1);
+  }
 
 };
 
@@ -691,7 +700,9 @@ public:
   { }
 
   KOKKOS_INLINE_FUNCTION
-  ~RunnableTask() = delete;
+  ~RunnableTask() {
+	  update_current_task_count(-1);
+  }
 
   KOKKOS_INLINE_FUNCTION
   void update_scheduling_info(

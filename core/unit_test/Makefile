@@ -2,6 +2,8 @@ KOKKOS_PATH = ../..
 
 GTEST_PATH = ../../tpls/gtest
 
+KOKKOS_CXX_STANDARD=c++14
+
 vpath %.cpp ${KOKKOS_PATH}/core/unit_test
 vpath %.cpp ${KOKKOS_PATH}/core/unit_test/default
 vpath %.cpp ${KOKKOS_PATH}/core/unit_test/serial
@@ -31,7 +33,7 @@ else
   CXX = g++
 endif
 
-CXXFLAGS = -O3 
+CXXFLAGS = -O3
 LINK ?= $(CXX)
 LDFLAGS ?= 
 ifneq ($(KOKKOS_ENABLE_EMU), 1)
