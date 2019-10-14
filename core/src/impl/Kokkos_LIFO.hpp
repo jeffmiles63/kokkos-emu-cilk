@@ -296,7 +296,7 @@ public:
   KOKKOS_INLINE_FUNCTION
   bool push(node_type& node)
   {
-    while(!this->try_push(node)) { /* retry until success */ }
+    while(!this->try_push(node)) { RESCHEDULE(); /* retry until success */ }
     // for consistency with push interface on other queue types:
     return true;
   }

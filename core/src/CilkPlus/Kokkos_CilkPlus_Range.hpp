@@ -95,6 +95,7 @@ private:
 		   }
          }
        }
+       cilk_sync;
 #else
       //long * refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
       int mz = Kokkos::Experimental::EmuReplicatedSpace::memory_zones();
@@ -135,15 +136,15 @@ private:
 		   }
          }
        }
+       cilk_sync;
 #else
-      long * refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
+      //long * refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
       int mz = Kokkos::Experimental::EmuReplicatedSpace::memory_zones();
       int sc_count = ( par_loop / mz ) + ( ( (par_loop % mz ) == 0 ) ? 0 : 1);
       if (sc_count == 0) sc_count = 1;
       //printf("T tree spawn parallel for: b= %d, e = %d, l = %d, par = %d, sc = %d, int = %d \n", b, e, len, par_loop, sc_count, int_loop);
       for (typename Policy::member_type i = 0 ; i < mz ; ++i ) {
-           //printf("T parallel for spawn: i = %d \n", (const int)i);
-           _Cilk_migrate_hint(&refPtr[i]);
+           //printf("T parallel for spawn: i = %d \n", (const int)i);           
            _Cilk_spawn inner_exec<TagType>(t, int_loop, sc_count, i, b);
        }
        cilk_sync;

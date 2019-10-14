@@ -118,7 +118,7 @@ public:
     : acc_( accessor_type() )
     , map_( rhs.map_ )
     , ptr_( rhs.ptr_ )
-    { printf("mdspan copy constructor: %08x \n", ptr_);}
+    { /*printf("mdspan copy constructor: %08x \n", ptr_);*/ }
 
   template<class OtherElementType,
            class OtherExtents,

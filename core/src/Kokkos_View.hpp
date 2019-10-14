@@ -562,7 +562,11 @@ public:
   using reference     = ElementType&;
   
   size_t block_size;
-  
+  static const size_t size_of_type = sizeof( element_type) + 
+                              ( ((sizeof( element_type ) % sizeof(long)) == 0) ? 
+                              0 : (sizeof(long) - (sizeof( element_type ) % sizeof(long))) );
+  static const size_t size_count = size_of_type / sizeof(long);
+                                
   accessor_strided( const accessor_strided & rhs) = default;
   accessor_strided & operator = ( const accessor_strided & rhs) = default;
   accessor_strided( ) : block_size(1) {
@@ -574,17 +578,25 @@ public:
 
   constexpr typename offset_policy::pointer
     offset( pointer p , ptrdiff_t i ) const noexcept
-    {        
-       element_type * pRef = (pointer)mw_arrayindex(p, i/block_size, NODELETS(),  block_size * sizeof(element_type));
-       //Kokkos::Experimental::print_pointer(i, pRef, "strided offset");
-       return (typename offset_policy::pointer)(&pRef[i%block_size]);
+    {  
+	   size_t off = i/block_size;
+	   size_t ndx = i % block_size;
+	   KOKKOS_EXPECTS( (off) < NODELETS() );
+       long * pRef = (long *)mw_arrayindex((void*)p, off, NODELETS(),  block_size * size_of_type);
+       //printf("Ptr::strided pointer: (%d) %d, %d, %lx \n", sizeof(element_type), i, off, pRef); fflush(stdout);       
+       return (typename offset_policy::pointer)(&pRef[ndx * size_count]);
 	}
 
   constexpr reference access( pointer p , ptrdiff_t i ) const noexcept
-    {        
-       element_type * pRef = static_cast<pointer>(mw_arrayindex(p, i/block_size, 8,  block_size * sizeof(element_type)));
-       //Kokkos::Experimental::print_pointer(i, pRef, "strided access");
-       return *(&pRef[i%block_size]);
+    {    
+	   size_t off = i/block_size;  
+	   size_t ndx = i % block_size;
+	   KOKKOS_EXPECTS( off < NODELETS() );         	   
+       long * pRef = (long *)(mw_arrayindex((void*)p, off, NODELETS(),  block_size * size_of_type));
+       //if ( size_of_type > sizeof(long) )
+       //   printf("Ref::strided pointer: %d-%d-%d (%d) %d, %lx %lx\n", size_of_type, ndx, size_count, i, off, pRef, p); fflush(stdout);        
+          
+       return *((pointer)(&pRef[ndx*size_count]));
 	}
 
   constexpr ElementType* decay( pointer p ) const noexcept
@@ -2401,9 +2413,14 @@ typename traits::memory_space
     typedef Impl::ViewValueFunctor< execution_space , pointer_type, value_type > functor_type ;
     typedef Kokkos::Impl::SharedAllocationRecord< memory_space , functor_type > record_type ;
 
- 
-    const size_t alloc_size =
-      ( m_map.mapping().required_span_size() * sizeof( typename traits::value_type ) );
+    size_t size_of_type = sizeof( typename traits::value_type ) + 
+                          ( ((sizeof( typename traits::value_type ) % sizeof(long)) == 0) ? 
+                          0 : (sizeof(long) - ((sizeof( typename traits::value_type ) % sizeof(long))) ));
+//    const size_t alloc_size =
+//      ( m_map.mapping().required_span_size() * sizeof( typename traits::value_type ) );
+    const size_t alloc_size = get_block_size() * 
+                              memory_space::memory_zones() *
+                              size_of_type;
     
     //long node_id = NODE_ID();
     //printf("View allocating memory in space: %s - %d  \n", memory_space::name(), alloc_size );
@@ -2451,6 +2468,7 @@ typename traits::memory_space
     : m_track()
     , m_map(nullptr, mdspan_mapping< mapping_type, extents_type, view_data_analysis, typename traits::array_layout>::mapping(arg_layout))
     {
+	  typedef Kokkos::Impl::SharedAllocationRecord< typename traits::memory_space , void > access_record_type;
       // Append layout and spaces if not input
       typedef Impl::ViewCtorProp< P ... > alloc_prop_input ;
 
@@ -2525,8 +2543,10 @@ typename traits::memory_space
       //fflush(stdout);
       // need to set the blocksize for these.
       m_map.acc_ = get_updated_accessor<accessor_type>( );
+      
+      access_record_type * acc_rec = static_cast<access_record_type*>(record);
 	  
-      m_map.ptr_ = (pointer_type)record->data();
+      m_map.ptr_ = (pointer_type)acc_rec->data();
     }
     
   template<class accessor_type>
@@ -2552,22 +2572,28 @@ typename traits::memory_space
   int get_block_size() const
     {		
 		using mem_space = typename traits::memory_space;
-		int nReturn = mem_space::memory_zones();
+		int nReturn = capacity();
 		if (is_layout_left) {
-			if (Rank >1) {		       
-		       nReturn = m_map.stride( Rank - 2 );
-		    } else if (Rank == 1) {
-			   nReturn = extent(0) / mem_space::memory_zones();
+			if ( (Rank >1) && (m_map.extent( Rank - 1 ) == mem_space::memory_zones()) ) {
+		       nReturn = m_map.stride( Rank - 1 );
+		    } else {
+			   size_t cap = capacity();
+			   nReturn = (cap / mem_space::memory_zones()) + 
+			             (( (cap % mem_space::memory_zones()) == 0) ? 0 : 1);
 			}
 			//printf("layout left returning block size: Rank = %d, stride=%d \n", Rank, nReturn);
+			//fflush(stdout);
 	    }
         else if (is_layout_right) {
-			if (Rank >1) {		       
+			if ( (Rank >1) && (m_map.extent( 0 ) == mem_space::memory_zones()) ) {		       
 		       nReturn = m_map.stride( 0 );
-		    } else if (Rank == 1) {
-			   nReturn = extent(0) / mem_space::memory_zones();
+		    } else {
+			   size_t cap = capacity();
+			   nReturn = (cap / mem_space::memory_zones()) + 
+			             (( (cap % mem_space::memory_zones()) == 0) ? 0 : 1);
 			}
 			//printf("layout right returning block size: Rank = %d, stride=%d \n", Rank, nReturn);
+			//fflush(stdout);
 	    }
         return nReturn;
     }

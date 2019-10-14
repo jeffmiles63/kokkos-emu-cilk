@@ -180,8 +180,10 @@ public:
 
   
   static void team_task_head(int offset, int i, scheduler_type const& scheduler, long* data_ref) {
+#ifdef DEBUG_TASKS    
 	  printf("team task head: %d, %d  \n", offset, i );
 	  fflush(stdout);
+#endif
 	  	  	  	  
       auto team_scheduler = scheduler.get_team_scheduler(i);
       auto& team_queue = team_scheduler.queue();
@@ -191,7 +193,9 @@ public:
       
       int n = 0;  // team_rank
       while ( true ) {
+#ifdef DEBUG_TASK_COUNT 		  
 		 int nStatusCounter = 0;
+#endif
          while ( true ) {
 		  
  		    //printf("head [%d] looking for task %d \n", i, n );
@@ -214,6 +218,7 @@ public:
 				   n=0;
 			   }
 	        } else {	
+#ifdef DEBUG_TASK_COUNT				
 			   nStatusCounter++;
 			   
 			   if (nStatusCounter > 10000) {
@@ -221,6 +226,7 @@ public:
 				   printf("task head %d has been waiting a while with nothing to do %d of %d...\n", i, n, get_current_node_count());
 				   print_ready_queue_count(scheduler);
 			   }
+#endif			   
 			   // only check this if the pop ready task returned nothing...      
 	           if ( team_queue.is_done(i) && all_queues_are_done(scheduler) ) {
 			     break;
@@ -241,9 +247,10 @@ public:
 		}
 		
 	 }
- 	    
+#ifdef DEBUG_TASKS    
  	 printf("exit head task loop: %d - %d \n", i, n);
  	 fflush(stdout);
+#endif
   }
   
   static void print_ready_queue_count(scheduler_type const& scheduler) {
@@ -320,9 +327,11 @@ public:
        cilk_spawn_at(&data_ref[i]) team_task_head( offset, i, scheduler, data_ref );
     }
     cilk_sync;
+#ifdef DEBUG_TASKS    
     printf("returning from exec: %s , %d \n", all_queues_are_done(scheduler) ? "true" : "false", get_current_node_count());
     fflush(stdout);
     print_ready_queue_count(scheduler);
+#endif
     
   }
   
@@ -420,7 +429,7 @@ public:
           cilk_spawn_at(&data_ref[i]) launch_task( offset, 1, i, scheduler, data_ref );
        }
        cilk_sync;
-       offset += 64;
+       RESCHEDULE();
     }
   }
 

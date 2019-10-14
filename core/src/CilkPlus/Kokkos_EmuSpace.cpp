@@ -237,12 +237,18 @@ void * EmuReplicatedSpace::allocate( const size_t arg_alloc_size ) const
 
 void * EmuStridedSpace::allocate( const size_t arg_alloc_size ) const
 {
+  // Important note here...arg_alloc_size needs to be evenly divisible by NODELETS()
+  // because the depth needs to hold n number of elements of size element_type
+  KOKKOS_EXPECTS( (arg_alloc_size % NODELETS()) == 0 )
   void * ptr = NULL;
 
   size_t tcnt = NODELETS();
-  size_t depth = ( arg_alloc_size / tcnt ) + sizeof(double);
+  size_t depth = ( arg_alloc_size / tcnt );
+  //printf("strided space memory allocated: %d, %d \n", tcnt, depth);
+  //fflush(stdout);
+  
   ptr = (void*)mw_malloc2d( tcnt, depth );
-  //printf("strided space memory allocated: %d, %d, %lx \n", tcnt, depth, ptr);
+  //printf("                              :  %lx \n", ptr);
   //fflush(stdout);
 
   return ptr ;
@@ -403,7 +409,8 @@ allocate( const char *                         arg_label
         , const size_t                         arg_alloc_size
         )
 {
-
+   //printf("strided SAR 2 par allocate: %d, %s \n", arg_alloc_size, arg_label);
+   //fflush(stdout);
    long * lRef = (long*)Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
    Kokkos::Experimental::EmuStridedSpace* pMem = ((Kokkos::Experimental::EmuStridedSpace*)mw_ptr1to0(Kokkos::Experimental::EmuStridedSpace::ess));
    Kokkos::Experimental::EmuReplicatedSpace* pRepl = ((Kokkos::Experimental::EmuReplicatedSpace*)mw_ptr1to0(Kokkos::Experimental::EmuReplicatedSpace::ers));
@@ -629,8 +636,11 @@ SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , void >::custo
         SharedAllocationRecord<void,void> * root_next = 0 ;
 
         // Lock the list:
-        while ( ( root_next = (SharedAllocationRecord<void,void> *)Kokkos::atomic_exchange( & pL->m_root->m_next , zero ) ) == zero );
-
+        while (root_next == zero) {			
+			root_next = (SharedAllocationRecord<void,void> *)Kokkos::atomic_exchange( & pL->m_root->m_next , zero );
+			if (root_next == zero)
+			   RESCHEDULE();
+        }
         pL->m_next->m_prev = pL->m_prev ;
 
         if ( root_next != pL ) {
@@ -704,7 +714,11 @@ SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void >::custom_d
         SharedAllocationRecord<void,void> * root_next = 0 ;
 
         // Lock the list:
-        while ( ( root_next = (SharedAllocationRecord<void,void> *)Kokkos::atomic_exchange( & pL->m_root->m_next , zero ) ) == zero );
+        while ( root_next == zero ) {
+			root_next = (SharedAllocationRecord<void,void> *)Kokkos::atomic_exchange( & pL->m_root->m_next , zero );
+			if (root_next == zero)
+			   RESCHEDULE();
+		}
 
         pL->m_next->m_prev = pL->m_prev ;
 
@@ -868,6 +882,8 @@ SharedAllocationRecord( RecordBase*                      basePtr
 //    Kokkos::Profiling::allocateData(Kokkos::Profiling::SpaceHandle(arg_space.name()),arg_label,data(),arg_alloc_size);
 //  }
 //  #endif
+  //printf("strided SAR constructor %lx \n", data_ptr);
+  //fflush(stdout);
   // Fill in the Header information, directly accessible via UVM
   this->m_custom_inc = Kokkos::Experimental::EmuStridedSpace::custom_increment;
   this->m_custom_dec = Kokkos::Experimental::EmuStridedSpace::custom_decrement;

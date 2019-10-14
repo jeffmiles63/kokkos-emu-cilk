@@ -868,7 +868,13 @@ public:
   static Kokkos::Impl::SharedAllocationRecord<void, void> * custom_decrement( Kokkos::Impl::SharedAllocationRecord<void, void> * );
 
   std::string get_label() const ;
-
+  
+  /* User's memory begins at the end of the header */
+  KOKKOS_INLINE_FUNCTION
+  void * data() const { 
+	  EmuStridedAllocationHeader * pEmuHead = (EmuStridedAllocationHeader*)RecordBase::m_alloc_ptr;  
+	  return reinterpret_cast<void*>( pEmuHead->m_stridedData ); }
+	  
   static SharedAllocationRecord * allocate( const char *                  arg_label
                                           , const size_t                  arg_alloc_size
                                           );
@@ -1020,6 +1026,12 @@ public:
                                    , const size_t        arg_alloc
                                    );
                                    
+  /* User's memory begins at the end of the header */
+  KOKKOS_INLINE_FUNCTION
+  void * data() const { 
+	  EmuStridedAllocationHeader * pEmuHead = (EmuStridedAllocationHeader*)RecordBase::m_alloc_ptr;  
+	  return reinterpret_cast<void*>( pEmuHead->m_stridedData ); }
+                                   
 };
 
 
@@ -1043,7 +1055,7 @@ allocate( const Kokkos::Experimental::EmuReplicatedSpace & arg_space
       repl_shared_rec * pRec = (repl_shared_rec*)mw_get_localto(vr,&lRef[i]);
       SharedAllocationHeader* pH = (SharedAllocationHeader*)mw_get_localto(vh, &lRef[i]);
       repl_shared_rec::RecordBase* rb = (repl_shared_rec::RecordBase*)mw_get_localto(Kokkos::Experimental::EmuReplicatedSpace::repl_root_record, &lRef[i]);
-      new (pRec) repl_shared_rec( rb, szLabel, arg_alloc, pH, (int)NODE_ID() );
+      new (pRec) repl_shared_rec( rb, szLabel, arg_alloc, pH, i );
    }
    return (SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , DestroyFunctor >*)vr;
 }
@@ -1074,7 +1086,7 @@ local_sp_alloc(int i, void * vr, void * vh, const char * szLabel, const size_t a
       SharedAllocationHeader* pH = (SharedAllocationHeader*)mw_get_nth(vh, i);
       strided_shared_rec::RecordBase* rb = (strided_shared_rec::RecordBase*)mw_get_nth(
                                     Kokkos::Experimental::EmuStridedSpace::strided_root_record, i);
-      new (pRec) strided_shared_rec( rb, (const char*)mw_ptr1to0(&szLabel[0]), arg_alloc, pH, vd, (int)NODE_ID() );  // each replica of the record/header points to the same memory head.      
+      new (pRec) strided_shared_rec( rb, (const char*)mw_ptr1to0(&szLabel[0]), arg_alloc, pH, vd, i );  // each replica of the record/header points to the same memory head.      
 }
 
 template< class DestroyFunctor >
@@ -1088,7 +1100,7 @@ allocate( const Kokkos::Experimental::EmuStridedSpace & arg_space
    typedef SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , DestroyFunctor > strided_shared_rec;	
    char szLabel[255];
    strcpy(szLabel, arg_label.c_str());
-   //printf("strided specialized record allocator: %s", szLabel);
+   //printf("strided specialized record allocator: %s \n", szLabel);
    //fflush(stdout);
    Kokkos::Experimental::EmuStridedSpace* pMem = (Kokkos::Experimental::EmuStridedSpace*)Kokkos::Experimental::EmuStridedSpace::ess;
    Kokkos::Experimental::EmuReplicatedSpace* pRepl = (Kokkos::Experimental::EmuReplicatedSpace*)Kokkos::Experimental::EmuReplicatedSpace::ers;
@@ -1101,6 +1113,7 @@ allocate( const Kokkos::Experimental::EmuStridedSpace & arg_space
    for ( int i = 0; i < *Kokkos::Experimental::EmuReplicatedSpace::node_count; i++) {
 	  cilk_spawn_at(&lRef[i]) local_sp_alloc(i, vr, vh, szLabel, arg_alloc, vd);
    }
+   cilk_sync;
    //printf("return from EmuStrided allocate \n");
    //fflush(stdout);
    return (SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , DestroyFunctor >*)vr;

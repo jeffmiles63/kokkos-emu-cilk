@@ -13,6 +13,65 @@ namespace Experimental {
 }}
 
 namespace test {
+	
+template<class Scalar>
+struct TestContainer {
+	long a;
+	long b;
+	long c;
+};
+
+template<class Scalar>
+struct ConFunctor {
+	typedef Kokkos::View< TestContainer<Scalar> *,  Kokkos::Experimental::EmuStridedSpace > view_type;
+	
+	
+	struct TagInit{};
+	struct TagUpdate{};
+	
+	view_type vt;
+	//void * data_ptr;
+	//Kokkos::accessor_strided<TestContainer> as;
+	
+	ConFunctor( const view_type & vt_ ) : vt(vt_){
+	}
+//	ConFunctor( void * dt_, int bs_ ) : data_ptr(dt_), as(bs_) {
+//	}
+
+	
+	void operator() (const TagInit&, int i) const { 
+		  TestContainer<Scalar>  & tc = vt(i);
+		  //TestContainer & tc = as.access((TestContainer*)data_ptr, i);
+		  //printf("view pointer [%d] %lx \n", i, &tc);
+		  //fflush(stdout);
+		  
+		  //long* ptr = (long*)(&tc);
+		  //ptr[0] = 5;
+		  //tc.a = (i % 2);
+		  //tc.b = tc.a + 1;
+		  //tc.b = tc.a + 2;
+          new (&tc) TestContainer<Scalar> {};
+          //if (tc.a > 0) printf("[%d] tc.a = %d \n", i, tc.a); fflush(stdout);		
+	}
+
+	void operator() (const TagUpdate&, int i) const { 
+		  TestContainer<Scalar>  & tc = vt(i);    
+		  //TestContainer & tc = as.access((TestContainer*)data_ptr, i);
+//		  long* ptr = (long*)(&tc);
+//		  ptr[0] = 5;
+		  
+          //tc.a = i;
+          //tc.b = tc.a + 2;
+          //tc.c = tc.b + 3;
+		  tc.a = (2);
+		  tc.b = tc.a + 1;
+		  tc.c = tc.a + 2;
+          //if (tc.a > 0) printf("[%d] tc.a = %d \n", i, tc.a); fflush(stdout);
+          KOKKOS_EXPECTS( tc.c == 4 );
+	}
+
+	
+};
 
 template< class Scalar, class ExecSpace >
 void TestViewAccess( int N ) {
@@ -42,8 +101,8 @@ void TestViewAccess( int N ) {
    }
     
 
-   printf("Testing 2D view...\n");
-   fflush(stdout);   
+//   printf("Testing 2D view...\n");
+//   fflush(stdout);   
    Kokkos::View< Scalar**, Kokkos::HostSpace > dd_view( "2d view", 8, N );
    //printf ("host view size is %ld \n", (unsigned long)sizeof(cp_view));
    Kokkos::parallel_for (N, KOKKOS_LAMBDA (int i) {
@@ -116,8 +175,8 @@ void TestViewAccess( int N ) {
 //      Kokkos::View< Scalar*, Kokkos::HostSpace, Kokkos::MemoryTraits<0> > global_space_view( "global", N );      
 
 
-      printf("Testing access to global space view\n");
-      fflush(stdout);
+//      printf("Testing access to global space view\n");
+//      fflush(stdout);
 
       Kokkos::parallel_for(N, KOKKOS_LAMBDA (const int i) {
 //      for (int i = 0; i < N; i++) {
@@ -127,7 +186,7 @@ void TestViewAccess( int N ) {
    }
    Kokkos::fence();
   
-   printf("Testing access to strided space view\n");
+   printf("Access to global space view test complete: %d\n", N);
    fflush(stdout);
    
    for (int r = 0; r < 1; r++) 
@@ -136,8 +195,8 @@ void TestViewAccess( int N ) {
 //      printf ("strided view size is %ld \n", (unsigned long)sizeof(strided_space_view));
 //      fflush(stdout);
 
-      printf("updating strided space view\n");
-      fflush(stdout);
+//      printf("updating strided space view\n");
+//      fflush(stdout);
 
       Kokkos::parallel_for(N, KOKKOS_LAMBDA (const int i) {      
 //      for (int i = 0; i < N; i++ ) {
@@ -152,8 +211,8 @@ void TestViewAccess( int N ) {
 //      printf ("strided view size is %ld \n", (unsigned long)sizeof(strided_space_view));
 //      fflush(stdout);
 
-      printf("updating strided space view\n");
-      fflush(stdout);
+//      printf("updating strided space view\n");
+//      fflush(stdout);
 
       Kokkos::parallel_for(8, KOKKOS_LAMBDA (const int i) {
          for (int r = 0; r < N; r++ ) {
@@ -162,9 +221,30 @@ void TestViewAccess( int N ) {
       });
    }
    
+   
+   for (int r = 0; r < 1; r++) 
+   {
+      Kokkos::View< TestContainer<long>*, Kokkos::Experimental::EmuStridedSpace > strided_space_view( "strided", N );
+
+      // have to initialize it first (view doesn't do that automatically right now.)
+      printf("initializing container view: %d \n", N); fflush(stdout);
+      
+      //void* test_data = (void*)mw_malloc2d(NODELETS(), block_size * size_of_type);
+      ConFunctor<long> cf(strided_space_view);
+      //ConFunctor cf(test_data, block_size);
+      Kokkos::parallel_for(Kokkos::RangePolicy<Kokkos::Experimental::CilkPlus,ConFunctor<long>::TagInit>(0,N), cf);
+     
+      printf("using container view: %d \n", N); fflush(stdout);
+      // now we can use it..
+      Kokkos::parallel_for(Kokkos::RangePolicy<Kokkos::Experimental::CilkPlus,ConFunctor<long>::TagUpdate>(0,N), cf);
+      
+
+   }
+   
+   
    Kokkos::fence();
-//   printf("Done Testing access to strided space view\n");
-//   fflush(stdout);
+   printf("Done Testing access to strided space view: %d\n", N);
+   fflush(stdout);
    
 }
 
