@@ -412,6 +412,7 @@ public:
 	  }
 	  fflush(stdout);
     } else {
+	   RESCHEDULE();
 	   KOKKOS_EXPECTS(predecessor_not_ready);
 		//printf("schedule runnable ending without really doing anything %d, pred is probably an aggr  %d ...\n", task.node_id, pred_id);
 	}

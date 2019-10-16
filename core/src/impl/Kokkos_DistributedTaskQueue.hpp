@@ -67,7 +67,7 @@
 #include <typeinfo>
 #include <stdexcept>
 
-
+#define ENABLE_TASK_STEALING
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
 
@@ -373,6 +373,7 @@ public:
 
     return_value = team_queue.pop_ready_task(typename single_queue_type::team_scheduler_info_type{});
 
+#ifdef ENABLE_TASK_STEALING
     if(not return_value) {
 
       // loop through the rest of the teams and try to steal
@@ -387,6 +388,7 @@ public:
 
       // Note that this is where we'd update the task's scheduling info
     }
+#endif
     // if nothing was found, return a default-constructed (empty) OptionalRef
     return return_value;
   }

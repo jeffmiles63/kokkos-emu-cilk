@@ -570,10 +570,10 @@ public:
   accessor_strided( const accessor_strided & rhs) = default;
   accessor_strided & operator = ( const accessor_strided & rhs) = default;
   accessor_strided( ) : block_size(1) {
-	      //printf("strided accessor block = %d \n", block_size);
+	      //printf("default strided accessor block = %d \n", block_size); fflush(stdout);
 	  }
   accessor_strided( const size_t b_ ) : block_size(b_) {
-	    //printf("strided accessor block = %d \n", block_size);
+	    //printf("strided accessor block = %d \n", block_size); fflush(stdout);
 	}
 
   constexpr typename offset_policy::pointer
@@ -591,6 +591,10 @@ public:
     {    
 	   size_t off = i/block_size;  
 	   size_t ndx = i % block_size;
+	   if ( off >= NODELETS() ) {
+		   printf("strided red is about to fail: %d-%d-%d (%d) %d, %lx \n", size_of_type, ndx, size_count, i, off, p); 
+		   fflush(stdout);
+	   }
 	   KOKKOS_EXPECTS( off < NODELETS() );         	   
        long * pRef = (long *)(mw_arrayindex((void*)p, off, NODELETS(),  block_size * size_of_type));
        //if ( size_of_type > sizeof(long) )
