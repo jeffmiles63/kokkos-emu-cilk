@@ -603,7 +603,7 @@ struct kokkos_cilk_reducer< ReducerType, Functor, defaultType, WorkTagFwd , type
                                                                            global_reducer(gr_) {
         //printf("constructing reducer for array %d \n", id);
 																			   
-        uint64_t myRed = (long) mw_ptr0to1(this);
+        uint64_t myRed = (long) this;
         this->lVal = (typename reduce_container::rd_value_type *)mw_localmalloc( l_alloc_bytes, (void*)myRed );
 
         // construct functor on nodelet

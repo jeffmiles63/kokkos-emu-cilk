@@ -153,7 +153,7 @@ void TestViewAccess( int N ) {
    }
    printf("local memory view test complete\n");
 
-
+*/
 
    {
       Kokkos::View< Scalar*, Kokkos::Experimental::EmuReplicatedSpace > replicated_space_view( "replicated", N );   
@@ -161,11 +161,15 @@ void TestViewAccess( int N ) {
       printf("Testing access to replicated space view\n");
       fflush(stdout);
 
-      Kokkos::parallel_for (N, KOKKOS_LAMBDA (int i) {
-         replicated_space_view(i) = (Scalar)i;
+      Kokkos::parallel_for (Kokkos::Experimental::EmuReplicatedSpace::memory_zones(), KOKKOS_LAMBDA (int i) {
+         long * refPtr = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
+//         printf("inside loop: %d \n", i); fflush(stdout);
+         MIGRATE(&refPtr[i]);
+         for (int n = 0; n < N; n++) {
+            replicated_space_view(n) = (Scalar)n;
+		 }
       });
-   }
-*/ 
+   } 
    
    
    Kokkos::fence();

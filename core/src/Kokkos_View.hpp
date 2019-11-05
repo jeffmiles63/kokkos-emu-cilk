@@ -615,25 +615,22 @@ public:
   using offset_policy = accessor_replicated;
   using reference     = ElementType&;
   
-  size_t block_size;
-  
   accessor_replicated( const accessor_replicated & rhs) = default;
   accessor_replicated & operator = ( const accessor_replicated & rhs) = default;
-  accessor_replicated( ) : block_size(1) {}
-  accessor_replicated( const size_t b_ ) : block_size(b_) {
-  }
+  accessor_replicated( ) {}
+  accessor_replicated( const size_t ) {  }
 
   constexpr typename offset_policy::pointer
     offset( pointer p , ptrdiff_t i ) const noexcept
-    {        
-       element_type * pRef = (pointer)mw_arrayindex(p, i/block_size, NODELETS(),  block_size * sizeof(element_type));
-       return (typename offset_policy::pointer)(&pRef[i%block_size]);
+    {  
+	   //printf("access repl pointer: %d \n", i); fflush(stdout);
+       return (typename offset_policy::pointer)(&p[i]);
 	}
 
   constexpr reference access( pointer p , ptrdiff_t i ) const noexcept
-    {        
-       element_type * pRef = static_cast<pointer>(mw_arrayindex(p, i/block_size, 8,  block_size * sizeof(element_type)));
-       return *(&pRef[i%block_size]);
+    {  
+	   //printf("access repl ref: %d \n", i); fflush(stdout);
+       return *(&p[i]);
 	}
 
   constexpr ElementType* decay( pointer p ) const noexcept
@@ -659,13 +656,13 @@ public:
     offset( pointer p , ptrdiff_t i ) const noexcept
     {        
 	   //Kokkos::Experimental::print_pointer(i, p, "remote offset");
-       return (typename offset_policy::pointer)(mw_ptr1to0(&p[i]));
+       return (typename offset_policy::pointer)(&p[i]);
 	}
 
   constexpr reference access( pointer p , ptrdiff_t i ) const noexcept
     {        
 	   //Kokkos::Experimental::print_pointer(i, p, "remote accessor before");
-       element_type * pRef = static_cast<pointer>(mw_ptr1to0(&p[i]));
+       element_type * pRef = static_cast<pointer>(&p[i]);
        //Kokkos::Experimental::print_pointer(i, pRef, "remote accessor after");
        return *(pRef);
 	}

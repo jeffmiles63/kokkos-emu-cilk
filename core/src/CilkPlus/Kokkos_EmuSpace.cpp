@@ -332,7 +332,7 @@ namespace Impl {
 std::string
 SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , void >::get_label() const
 {
-  SharedAllocationHeader * header = (SharedAllocationHeader *)mw_ptr1to0(RecordBase::head());
+  SharedAllocationHeader * header = (SharedAllocationHeader *)RecordBase::head();
 
   return std::string( header->m_label );
 }
@@ -360,9 +360,9 @@ allocate( const Kokkos::Experimental::EmuLocalSpace &  arg_space
 //   fflush(stdout);
    typedef SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , void > local_shared_rec;
 /*   int cur_node = NODE_ID();
-   Kokkos::Experimental::EmuLocalSpace* spPtr = (Kokkos::Experimental::EmuLocalSpace*)mw_ptr1to0(&arg_space);
-   const char * szLabel = (const char *)mw_ptr1to0(arg_label.c_str());
-   local_shared_rec::RecordBase* rb = (local_shared_rec::RecordBase*)mw_ptr1to0(Kokkos::Experimental::EmuLocalSpace::local_root_record);
+   Kokkos::Experimental::EmuLocalSpace* spPtr = (Kokkos::Experimental::EmuLocalSpace*)&arg_space;
+   const char * szLabel = (const char *)arg_label.c_str();
+   local_shared_rec::RecordBase* rb = (local_shared_rec::RecordBase*)Kokkos::Experimental::EmuLocalSpace::local_root_record;
    void * sr = arg_space.allocate( sizeof(SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , void >) );
    new (sr) SharedAllocationRecord( rb, spPtr , szLabel , arg_alloc_size, cur_node );
    return (SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , void > *)sr;*/
@@ -384,7 +384,7 @@ allocate( const char *                  arg_label
 {
    
    long * lRef = (long*)Kokkos::Experimental::getRefPtr();
-   Kokkos::Experimental::EmuReplicatedSpace* pMem = ((Kokkos::Experimental::EmuReplicatedSpace*)mw_ptr1to0(Kokkos::Experimental::EmuReplicatedSpace::ers));
+   Kokkos::Experimental::EmuReplicatedSpace* pMem = ((Kokkos::Experimental::EmuReplicatedSpace*)Kokkos::Experimental::EmuReplicatedSpace::ers);
    void *vr = pMem->allocate(sizeof(Kokkos::Experimental::repl_shared_rec));
    void *vh = pMem->allocate(sizeof(SharedAllocationHeader) + arg_alloc_size);
                           
@@ -412,8 +412,8 @@ allocate( const char *                         arg_label
    //printf("strided SAR 2 par allocate: %d, %s \n", arg_alloc_size, arg_label);
    //fflush(stdout);
    long * lRef = (long*)Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
-   Kokkos::Experimental::EmuStridedSpace* pMem = ((Kokkos::Experimental::EmuStridedSpace*)mw_ptr1to0(Kokkos::Experimental::EmuStridedSpace::ess));
-   Kokkos::Experimental::EmuReplicatedSpace* pRepl = ((Kokkos::Experimental::EmuReplicatedSpace*)mw_ptr1to0(Kokkos::Experimental::EmuReplicatedSpace::ers));
+   Kokkos::Experimental::EmuStridedSpace* pMem = ((Kokkos::Experimental::EmuStridedSpace*)Kokkos::Experimental::EmuStridedSpace::ess);
+   Kokkos::Experimental::EmuReplicatedSpace* pRepl = ((Kokkos::Experimental::EmuReplicatedSpace*)Kokkos::Experimental::EmuReplicatedSpace::ers);
 
    void *vr = pRepl->allocate(sizeof(Kokkos::Experimental::strided_shared_rec));      // allocate the record replicated...
    void *vh = pRepl->allocate(sizeof(EmuStridedAllocationHeader)); // allocate the header replicated...
@@ -665,19 +665,19 @@ SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , void >::custo
         //printf("cleared linked list on %d, now calling dealloc\n", i);
         //fflush(stdout);
 
-        function_type d = pL->m_dealloc ;
-        if (d != nullptr) {
-           (*d)( pL );
-        }
+//        function_type d = pL->m_dealloc ;
+//        if (d != nullptr) {
+//           (*d)( pL );
+//        }
      }
      else if ( old_count < 1 ) { // Error
         Kokkos::Impl::throw_runtime_exception("Kokkos::Impl::SharedAllocationRecord failed decrement count");
      }
   }
   if (bFreeMemory) {
-     Kokkos::Experimental::EmuReplicatedSpace* pMem = ((Kokkos::Experimental::EmuReplicatedSpace*)mw_ptr1to0(Kokkos::Experimental::EmuReplicatedSpace::ers));
-     pMem->deallocate(mw_ptr1to0(pRec->m_alloc_ptr), pRec->m_alloc_size);
-     pMem->deallocate(mw_ptr1to0(pRec), sizeof(SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , void >));
+     Kokkos::Experimental::EmuReplicatedSpace* pMem = ((Kokkos::Experimental::EmuReplicatedSpace*)Kokkos::Experimental::EmuReplicatedSpace::ers);
+     pMem->deallocate(pRec->m_alloc_ptr, pRec->m_alloc_size);
+     pMem->deallocate(pRec, sizeof(SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , void >));
   }
 
   return pRec;
@@ -759,12 +759,12 @@ SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void >::custom_d
 	 //printf("strided calling free memory ...\n");
 	 //fflush(stdout);
 	 
-     Kokkos::Experimental::EmuStridedSpace* pMem = ((Kokkos::Experimental::EmuStridedSpace*)mw_ptr1to0(Kokkos::Experimental::EmuStridedSpace::ess));
-     Kokkos::Experimental::EmuReplicatedSpace* pRepl = ((Kokkos::Experimental::EmuReplicatedSpace*)mw_ptr1to0(Kokkos::Experimental::EmuReplicatedSpace::ers));
+     Kokkos::Experimental::EmuStridedSpace* pMem = ((Kokkos::Experimental::EmuStridedSpace*)Kokkos::Experimental::EmuStridedSpace::ess);
+     Kokkos::Experimental::EmuReplicatedSpace* pRepl = ((Kokkos::Experimental::EmuReplicatedSpace*)Kokkos::Experimental::EmuReplicatedSpace::ers);
      if (sd != nullptr) {
         pMem->deallocate(sd, 0);
      }
-     pRepl->deallocate(mw_ptr1to0(pRec), sizeof(SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void >));
+     pRepl->deallocate(pRec, sizeof(SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void >));
      
   }
 
@@ -1091,7 +1091,7 @@ SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , void >::
 print_records( std::ostream & s , const Kokkos::Experimental::EmuLocalSpace & , bool detail )
 {
 #ifdef KOKKOS_DEBUG
-  SharedAllocationRecord< void , void > * rs = (SharedAllocationRecord< void , void > *)mw_ptr1to0(Kokkos::Experimental::EmuLocalSpace::local_root_record);
+  SharedAllocationRecord< void , void > * rs = (SharedAllocationRecord< void , void > *)Kokkos::Experimental::EmuLocalSpace::local_root_record;
   SharedAllocationRecord< void , void > * r = rs;
 
   char buffer[256] ;

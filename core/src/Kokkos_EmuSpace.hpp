@@ -1046,10 +1046,10 @@ allocate( const Kokkos::Experimental::EmuReplicatedSpace & arg_space
    typedef SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , DestroyFunctor > repl_shared_rec;
 
    long * lRef = (long*)Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
-   Kokkos::Experimental::EmuReplicatedSpace* pMem = ((Kokkos::Experimental::EmuReplicatedSpace*)mw_ptr1to0(Kokkos::Experimental::EmuReplicatedSpace::ers));
+   Kokkos::Experimental::EmuReplicatedSpace* pMem = ((Kokkos::Experimental::EmuReplicatedSpace*)Kokkos::Experimental::EmuReplicatedSpace::ers);
    void *vr = pMem->allocate(sizeof(repl_shared_rec));
    void *vh = pMem->allocate(sizeof(SharedAllocationHeader) + arg_alloc);   
-   const char * szLabel = mw_ptr1to0(arg_label.c_str());
+   const char * szLabel = arg_label.c_str();
                           
    for ( int i = 0; i < NODELETS(); i++) {
       repl_shared_rec * pRec = (repl_shared_rec*)mw_get_localto(vr,&lRef[i]);
@@ -1069,7 +1069,7 @@ allocate( const Kokkos::Experimental::EmuLocalSpace & arg_space
         )
 {
    typedef SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , DestroyFunctor > local_shared_rec;
-   const char * szLabel = mw_ptr1to0(arg_label.c_str());
+   const char * szLabel = arg_label.c_str();
                           
    local_shared_rec * pRec = (local_shared_rec*)arg_space.allocate(sizeof(local_shared_rec)); 
    local_shared_rec::RecordBase* rb = (local_shared_rec::RecordBase*)mw_get_localto(Kokkos::Experimental::EmuLocalSpace::local_root_record, pRec);
@@ -1086,7 +1086,7 @@ local_sp_alloc(int i, void * vr, void * vh, const char * szLabel, const size_t a
       SharedAllocationHeader* pH = (SharedAllocationHeader*)mw_get_nth(vh, i);
       strided_shared_rec::RecordBase* rb = (strided_shared_rec::RecordBase*)mw_get_nth(
                                     Kokkos::Experimental::EmuStridedSpace::strided_root_record, i);
-      new (pRec) strided_shared_rec( rb, (const char*)mw_ptr1to0(&szLabel[0]), arg_alloc, pH, vd, i );  // each replica of the record/header points to the same memory head.      
+      new (pRec) strided_shared_rec( rb, (const char*)&szLabel[0], arg_alloc, pH, vd, i );  // each replica of the record/header points to the same memory head.      
 }
 
 template< class DestroyFunctor >

@@ -2305,7 +2305,7 @@ struct HandleTypeImpl< Traits, typename std::enable_if<( Traits::memory_traits::
 
    KOKKOS_FORCEINLINE_FUNCTION
    value_type & operator [](size_t offset) const {
-       value_type * pRef = (value_type *)mw_ptr1to0(&m_ptr[offset]);
+       value_type * pRef = (value_type *)&m_ptr[offset];
        return *pRef;
    }   
 
