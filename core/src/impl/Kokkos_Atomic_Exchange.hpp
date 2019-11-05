@@ -233,7 +233,8 @@ unsigned int atomic_exchange( volatile unsigned int * const dest , const unsigne
 inline
 unsigned long long int atomic_exchange( volatile unsigned long long int * const dest , const unsigned long long int val )
 {
-  return local_atomic_exchange<unsigned long long>( (unsigned long long*) dest , val );
+  //return local_atomic_exchange<unsigned long long>( (unsigned long long*) dest , val );
+  return (unsigned long long int)ATOMIC_SWAP( (long*)dest, (long)val );
 }
 
 /** \brief  Atomic exchange for any type with compatible size */
@@ -254,9 +255,10 @@ T atomic_exchange(
   typename Kokkos::Impl::enable_if< sizeof(T) != sizeof(int) &&
                                     sizeof(T) == sizeof(unsigned long long int) , const T & >::type val )
 {
-  typedef unsigned long long int type ;
+  /*typedef unsigned long long int type ;
   type tmp = local_atomic_exchange<type>( ((type*)dest) , *((type*)&val) );
-  return *((T*)&tmp);
+  return *((T*)&tmp);*/
+  return (T)ATOMIC_SWAP( (long*)dest, (long)val );
 }
 
 template < typename T >

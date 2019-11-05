@@ -54,6 +54,10 @@
 #include<Cuda/Kokkos_Cuda_Version_9_8_Compatibility.hpp>
 #endif
 
+#if defined(KOKKOS_ENABLE_EMU)
+#include <intrinsics.h>
+#endif
+
 namespace Kokkos {
 
 //----------------------------------------------------------------------------
@@ -223,7 +227,8 @@ inline
 unsigned long long int atomic_fetch_add( volatile unsigned long long int * const dest ,
                                          const unsigned long long int val )
 {
-   return local_atomic_add<unsigned long long int>(dest, val);
+   //return local_atomic_add<unsigned long long int>(dest, val);
+   return (long long int)ATOMIC_ADDMS( (long*)dest, (long)val );
 }
 
 inline
@@ -253,7 +258,8 @@ T atomic_fetch_add( volatile T * const dest ,
   typename Kokkos::Impl::enable_if< sizeof(T) != sizeof(int) &&
                                     sizeof(T) == sizeof(unsigned long long int) , const T >::type val )
 {
-   return local_atomic_add<T>(dest, val);
+   //return local_atomic_add<T>(dest, val);
+   return (T)ATOMIC_ADDMS( (long*)dest, (long)val );
 }
 
 //----------------------------------------------------------------------------

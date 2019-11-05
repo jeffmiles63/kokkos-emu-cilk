@@ -197,6 +197,7 @@ unsigned long long int atomic_compare_exchange( volatile unsigned long long int 
                                                 const unsigned long long int compare ,
                                                 const unsigned long long int val )
 { 
+	/*
   unsigned long long int return_val;
   int nCnt = 0;
   while (true) {
@@ -214,7 +215,9 @@ unsigned long long int atomic_compare_exchange( volatile unsigned long long int 
      //if (nCnt %10000) printf("thread waiting for atomic compare exchange III...\n");
      Kokkos::Impl::emu_sleep((unsigned long)dest);
   }
-  return return_val;
+  return return_val;*/
+  
+  return ATOMIC_CAS( (long*)dest, val, compare );
 }
 
 template < typename T >
