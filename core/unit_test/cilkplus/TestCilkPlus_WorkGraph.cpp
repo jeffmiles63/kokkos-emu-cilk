@@ -41,5 +41,5 @@
 //@HEADER
 */
 
-#include<cilkplus/TestCilkPlus_Category.hpp>
-#include<TestWorkGraph.hpp>
+#include <cilkplus/TestCilkPlus_Category.hpp>
+#include <TestWorkGraph.hpp>

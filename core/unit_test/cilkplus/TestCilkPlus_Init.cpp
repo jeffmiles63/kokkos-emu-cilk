@@ -42,9 +42,7 @@
 //@HEADER
 */
 
-#include<cilkplus/TestCilkPlus_Category.hpp>
+#include <cilkplus/TestCilkPlus_Category.hpp>
 //#include<TestInit.hpp>
-#include<TestCompilerMacros.hpp>
-#include<TestPolicyConstruction.hpp>
-
-
+#include <TestCompilerMacros.hpp>
+#include <TestPolicyConstruction.hpp>

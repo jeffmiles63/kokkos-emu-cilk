@@ -49,7 +49,7 @@
 namespace Test {
 
 class CLASS_PUBLIC cilkplus : public ::testing::Test {
-public:  
+public:
   cilkplus();
 
   static void SetUpTestCase();

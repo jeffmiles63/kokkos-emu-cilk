@@ -41,16 +41,17 @@
 //@HEADER
 */
 
-#if defined( KOKKOS_ENABLE_RFO_PREFETCH )
+#if defined(KOKKOS_ENABLE_RFO_PREFETCH)
 #include <xmmintrin.h>
 #endif
 
 #include <Kokkos_Macros.hpp>
-#if defined( KOKKOS_ATOMIC_HPP ) && ! defined( KOKKOS_ATOMIC_COMPARE_EXCHANGE_STRONG_HPP )
+#if defined(KOKKOS_ATOMIC_HPP) && \
+    !defined(KOKKOS_ATOMIC_COMPARE_EXCHANGE_STRONG_HPP)
 #define KOKKOS_ATOMIC_COMPARE_EXCHANGE_STRONG_HPP
 
 #if defined(KOKKOS_ENABLE_CUDA)
-#include<Cuda/Kokkos_Cuda_Version_9_8_Compatibility.hpp>
+#include <Cuda/Kokkos_Cuda_Version_9_8_Compatibility.hpp>
 #endif
 
 #if defined(KOKKOS_ENABLE_EMU)
@@ -62,76 +63,76 @@
 namespace Kokkos {
 
 //----------------------------------------------------------------------------
-// Cuda native CAS supports int, unsigned int, and unsigned long long int (non-standard type).
-// Must cast-away 'volatile' for the CAS call.
+// Cuda native CAS supports int, unsigned int, and unsigned long long int
+// (non-standard type). Must cast-away 'volatile' for the CAS call.
 
-#if defined( KOKKOS_ENABLE_CUDA )
+#if defined(KOKKOS_ENABLE_CUDA)
 
 #if defined(__CUDA_ARCH__) || defined(KOKKOS_IMPL_CUDA_CLANG_WORKAROUND)
-__inline__ __device__
-int atomic_compare_exchange( volatile int * const dest, const int compare, const int val)
-{ return atomicCAS((int*)dest,compare,val); }
+__inline__ __device__ int atomic_compare_exchange(volatile int* const dest,
+                                                  const int compare,
+                                                  const int val) {
+  return atomicCAS((int*)dest, compare, val);
+}
 
-__inline__ __device__
-unsigned int atomic_compare_exchange( volatile unsigned int * const dest, const unsigned int compare, const unsigned int val)
-{ return atomicCAS((unsigned int*)dest,compare,val); }
+__inline__ __device__ unsigned int atomic_compare_exchange(
+    volatile unsigned int* const dest, const unsigned int compare,
+    const unsigned int val) {
+  return atomicCAS((unsigned int*)dest, compare, val);
+}
 
-__inline__ __device__
-unsigned long long int atomic_compare_exchange( volatile unsigned long long int * const dest ,
-                                                const unsigned long long int compare ,
-                                                const unsigned long long int val )
-{ return atomicCAS((unsigned long long int*)dest,compare,val); }
+__inline__ __device__ unsigned long long int atomic_compare_exchange(
+    volatile unsigned long long int* const dest,
+    const unsigned long long int compare, const unsigned long long int val) {
+  return atomicCAS((unsigned long long int*)dest, compare, val);
+}
 
-template < typename T >
-__inline__ __device__
-T atomic_compare_exchange( volatile T * const dest , const T & compare ,
-  typename Kokkos::Impl::enable_if< sizeof(T) == sizeof(int) , const T & >::type val )
-{
-  const int tmp = atomicCAS( (int*) dest , *((int*)&compare) , *((int*)&val) );
+template <typename T>
+__inline__ __device__ T atomic_compare_exchange(
+    volatile T* const dest, const T& compare,
+    typename Kokkos::Impl::enable_if<sizeof(T) == sizeof(int), const T&>::type
+        val) {
+  const int tmp = atomicCAS((int*)dest, *((int*)&compare), *((int*)&val));
   return *((T*)&tmp);
 }
 
-template < typename T >
-__inline__ __device__
-T atomic_compare_exchange( volatile T * const dest , const T & compare ,
-  typename Kokkos::Impl::enable_if< sizeof(T) != sizeof(int) &&
-                                    sizeof(T) == sizeof(unsigned long long int) , const T & >::type val )
-{
-  typedef unsigned long long int type ;
-  const type tmp = atomicCAS( (type*) dest , *((type*)&compare) , *((type*)&val) );
-  return *((T*)&tmp);
-}
-
-template < typename T >
-__inline__ __device__
-T atomic_compare_exchange( volatile T * const dest , const T & compare ,
+template <typename T>
+__inline__ __device__ T atomic_compare_exchange(
+    volatile T* const dest, const T& compare,
     typename Kokkos::Impl::enable_if<
-                  ( sizeof(T) != 4 )
-               && ( sizeof(T) != 8 )
-             , const T >::type& val )
-{
+        sizeof(T) != sizeof(int) && sizeof(T) == sizeof(unsigned long long int),
+        const T&>::type val) {
+  typedef unsigned long long int type;
+  const type tmp = atomicCAS((type*)dest, *((type*)&compare), *((type*)&val));
+  return *((T*)&tmp);
+}
+
+template <typename T>
+__inline__ __device__ T atomic_compare_exchange(
+    volatile T* const dest, const T& compare,
+    typename Kokkos::Impl::enable_if<(sizeof(T) != 4) && (sizeof(T) != 8),
+                                     const T>::type& val) {
   T return_val;
   // This is a way to (hopefully) avoid dead lock in a warp
   int done = 0;
 #ifdef KOKKOS_IMPL_CUDA_SYNCWARP_NEEDS_MASK
-  unsigned int mask = KOKKOS_IMPL_CUDA_ACTIVEMASK;
-  unsigned int active = KOKKOS_IMPL_CUDA_BALLOT_MASK(mask,1);
+  unsigned int mask   = KOKKOS_IMPL_CUDA_ACTIVEMASK;
+  unsigned int active = KOKKOS_IMPL_CUDA_BALLOT_MASK(mask, 1);
 #else
   unsigned int active = KOKKOS_IMPL_CUDA_BALLOT(1);
 #endif
   unsigned int done_active = 0;
-  while (active!=done_active) {
-    if(!done) {
-      if( Impl::lock_address_cuda_space( (void*) dest ) ) {
+  while (active != done_active) {
+    if (!done) {
+      if (Impl::lock_address_cuda_space((void*)dest)) {
         return_val = *dest;
-        if( return_val == compare )
-          *dest = val;
-        Impl::unlock_address_cuda_space( (void*) dest );
+        if (return_val == compare) *dest = val;
+        Impl::unlock_address_cuda_space((void*)dest);
         done = 1;
       }
     }
 #ifdef KOKKOS_IMPL_CUDA_SYNCWARP_NEEDS_MASK
-    done_active = KOKKOS_IMPL_CUDA_BALLOT_MASK(mask,done);
+    done_active = KOKKOS_IMPL_CUDA_BALLOT_MASK(mask, done);
 #else
     done_active = KOKKOS_IMPL_CUDA_BALLOT(done);
 #endif
@@ -141,130 +142,128 @@ T atomic_compare_exchange( volatile T * const dest , const T & compare ,
 #endif
 #endif
 
-#if defined( KOKKOS_ENABLE_EMU )
-inline
-int atomic_compare_exchange( volatile int * const dest, const int compare, const int val)
-{ 
+#if defined(KOKKOS_ENABLE_EMU)
+inline int atomic_compare_exchange(volatile int* const dest, const int compare,
+                                   const int val) {
   int return_val;
   int nCnt = 0;
   while (true) {
-     if (Impl::lock_addr((unsigned long)dest)) {
-        //DISABLE_INTERRUPTS();
-        return_val = *dest;
-        if( return_val == compare ) {
-           *dest = val;
-        }        
-        Impl::unlock_addr((unsigned long)dest);
-        //ENABLE_INTERRUPTS();
-        break;
-     }
-     nCnt++;
-     //if (nCnt %10000) printf("thread waiting for atomic compare exchange ...\n");
-     Kokkos::Impl::emu_sleep((unsigned long)dest);
+    if (Impl::lock_addr((unsigned long)dest)) {
+      // DISABLE_INTERRUPTS();
+      return_val = *dest;
+      if (return_val == compare) {
+        *dest = val;
+      }
+      Impl::unlock_addr((unsigned long)dest);
+      // ENABLE_INTERRUPTS();
+      break;
+    }
+    nCnt++;
+    // if (nCnt %10000) printf("thread waiting for atomic compare exchange
+    // ...\n");
+    Kokkos::Impl::emu_sleep((unsigned long)dest);
   }
-  
-  
+
   return return_val;
 }
 
-inline
-unsigned int atomic_compare_exchange( volatile unsigned int * const dest, const unsigned int compare, const unsigned int val)
-{ 
+inline unsigned int atomic_compare_exchange(volatile unsigned int* const dest,
+                                            const unsigned int compare,
+                                            const unsigned int val) {
   unsigned int return_val;
 
   int nCnt = 0;
   while (true) {
-     if (Impl::lock_addr((unsigned long)dest)) {
-        //DISABLE_INTERRUPTS();
-        return_val = *dest;
-        if( return_val == compare ) {
-           *dest = val;
-        }        
-        Impl::unlock_addr((unsigned long)dest);
-        //ENABLE_INTERRUPTS();
-        break;
-     }
-     nCnt++;
-     //if (nCnt %10000) printf("thread waiting for atomic compare exhange II...\n");
-     Kokkos::Impl::emu_sleep((unsigned long)dest);
+    if (Impl::lock_addr((unsigned long)dest)) {
+      // DISABLE_INTERRUPTS();
+      return_val = *dest;
+      if (return_val == compare) {
+        *dest = val;
+      }
+      Impl::unlock_addr((unsigned long)dest);
+      // ENABLE_INTERRUPTS();
+      break;
+    }
+    nCnt++;
+    // if (nCnt %10000) printf("thread waiting for atomic compare exhange
+    // II...\n");
+    Kokkos::Impl::emu_sleep((unsigned long)dest);
   }
-  
+
   return return_val;
 }
 
-inline
-unsigned long long int atomic_compare_exchange( volatile unsigned long long int * const dest ,
-                                                const unsigned long long int compare ,
-                                                const unsigned long long int val )
-{ 
-	/*
-  unsigned long long int return_val;
-  int nCnt = 0;
-  while (true) {
-     if (Impl::lock_addr((unsigned long)dest)) {
-        //DISABLE_INTERRUPTS();
-        return_val = *dest;
-        if( return_val == compare ) {
-           *dest = val;
-        }        
-        Impl::unlock_addr((unsigned long)dest);
-        //ENABLE_INTERRUPTS();
-        break;
-     }
-     nCnt++;
-     //if (nCnt %10000) printf("thread waiting for atomic compare exchange III...\n");
-     Kokkos::Impl::emu_sleep((unsigned long)dest);
+inline unsigned long long int atomic_compare_exchange(
+    volatile unsigned long long int* const dest,
+    const unsigned long long int compare, const unsigned long long int val) {
+  /*
+unsigned long long int return_val;
+int nCnt = 0;
+while (true) {
+if (Impl::lock_addr((unsigned long)dest)) {
+  //DISABLE_INTERRUPTS();
+  return_val = *dest;
+  if( return_val == compare ) {
+     *dest = val;
   }
-  return return_val;*/
-  
-  return ATOMIC_CAS( (long*)dest, val, compare );
+  Impl::unlock_addr((unsigned long)dest);
+  //ENABLE_INTERRUPTS();
+  break;
+}
+nCnt++;
+//if (nCnt %10000) printf("thread waiting for atomic compare exchange
+III...\n"); Kokkos::Impl::emu_sleep((unsigned long)dest);
+}
+return return_val;*/
+
+  return ATOMIC_CAS((long*)dest, val, compare);
 }
 
-template < typename T >
-inline
-T atomic_compare_exchange( volatile T * const dest , const T & compare ,
-  typename Kokkos::Impl::enable_if< sizeof(T) == sizeof(int) , const T & >::type val )
-{
-  const int tmp = atomic_compare_exchange( (int*) dest , *((int*)&compare) , *((int*)&val) );
+template <typename T>
+inline T atomic_compare_exchange(
+    volatile T* const dest, const T& compare,
+    typename Kokkos::Impl::enable_if<sizeof(T) == sizeof(int), const T&>::type
+        val) {
+  const int tmp =
+      atomic_compare_exchange((int*)dest, *((int*)&compare), *((int*)&val));
   return *((T*)&tmp);
 }
 
-template < typename T >
-inline
-T atomic_compare_exchange( volatile T * const dest , const T & compare ,
-  typename Kokkos::Impl::enable_if< sizeof(T) != sizeof(int) &&
-                                    sizeof(T) == sizeof(unsigned long long int) , const T & >::type val )
-{
-  typedef unsigned long long int type ;
-  const type tmp = atomic_compare_exchange( (type*) dest , *((type*)&compare) , *((type*)&val) );
-  return *((T*)&tmp);
-}
-
-template < typename T >
-inline
-T atomic_compare_exchange( volatile T * const dest , const T & compare ,
+template <typename T>
+inline T atomic_compare_exchange(
+    volatile T* const dest, const T& compare,
     typename Kokkos::Impl::enable_if<
-                  ( sizeof(T) != 4 )
-               && ( sizeof(T) != 8 )
-             , const T >::type& val )
-{
+        sizeof(T) != sizeof(int) && sizeof(T) == sizeof(unsigned long long int),
+        const T&>::type val) {
+  typedef unsigned long long int type;
+  const type tmp =
+      atomic_compare_exchange((type*)dest, *((type*)&compare), *((type*)&val));
+  return *((T*)&tmp);
+}
+
+template <typename T>
+inline T atomic_compare_exchange(
+    volatile T* const dest, const T& compare,
+    typename Kokkos::Impl::enable_if<(sizeof(T) != 4) && (sizeof(T) != 8),
+                                     const T>::type& val) {
   T return_val;
 
   int nCnt = 0;
   while (true) {
-     if (Impl::lock_addr((unsigned long)dest)) {
-        //DISABLE_INTERRUPTS();
-        return_val = *dest;
-        if( return_val == compare ) {
-           *dest = val;
-        }        
-        Impl::unlock_addr((unsigned long)dest);
-        //ENABLE_INTERRUPTS();
-        break;
-     }
-     nCnt++;
-     //if (nCnt %10000) printf("thread waiting for atomic compare exchange IV ...\n");
-     RESCHEDULE();
+    if (Impl::lock_addr((unsigned long)dest)) {
+      // DISABLE_INTERRUPTS();
+      return_val = *dest;
+      if (return_val == compare) {
+        *dest = val;
+      }
+      Impl::unlock_addr((unsigned long)dest);
+      // ENABLE_INTERRUPTS();
+      break;
+    }
+    nCnt++;
+    // if (nCnt %10000) printf("thread waiting for atomic compare exchange IV
+    // ...\n");
+    RESCHEDULE();
   }
 
   return return_val;
@@ -279,163 +278,162 @@ T atomic_compare_exchange( volatile T * const dest , const T & compare ,
 #if !defined(__CUDA_ARCH__) || defined(KOKKOS_IMPL_CUDA_CLANG_WORKAROUND)
 #if defined(KOKKOS_ENABLE_GNU_ATOMICS) || defined(KOKKOS_ENABLE_INTEL_ATOMICS)
 
-inline
-int atomic_compare_exchange( volatile int * const dest, const int compare, const int val)
-{
-#if defined( KOKKOS_ENABLE_RFO_PREFETCH )
-  _mm_prefetch( (const char*) dest, _MM_HINT_ET0 );
+inline int atomic_compare_exchange(volatile int* const dest, const int compare,
+                                   const int val) {
+#if defined(KOKKOS_ENABLE_RFO_PREFETCH)
+  _mm_prefetch((const char*)dest, _MM_HINT_ET0);
 #endif
-  return __sync_val_compare_and_swap(dest,compare,val);
+  return __sync_val_compare_and_swap(dest, compare, val);
 }
 
-inline
-long atomic_compare_exchange( volatile long * const dest, const long compare, const long val )
-{ 
-#if defined( KOKKOS_ENABLE_RFO_PREFETCH )
-  _mm_prefetch( (const char*) dest, _MM_HINT_ET0 );
+inline long atomic_compare_exchange(volatile long* const dest,
+                                    const long compare, const long val) {
+#if defined(KOKKOS_ENABLE_RFO_PREFETCH)
+  _mm_prefetch((const char*)dest, _MM_HINT_ET0);
 #endif
-  return __sync_val_compare_and_swap(dest,compare,val);
+  return __sync_val_compare_and_swap(dest, compare, val);
 }
 
-#if defined( KOKKOS_ENABLE_GNU_ATOMICS )
+#if defined(KOKKOS_ENABLE_GNU_ATOMICS)
 
 // GCC supports unsigned
 
-inline
-unsigned int atomic_compare_exchange( volatile unsigned int * const dest, const unsigned int compare, const unsigned int val )
-{ return __sync_val_compare_and_swap(dest,compare,val); }
-
-inline
-unsigned long atomic_compare_exchange( volatile unsigned long * const dest ,
-                                       const unsigned long compare ,
-                                       const unsigned long val )
-{ return __sync_val_compare_and_swap(dest,compare,val); }
-
-#endif
-
-template < typename T >
-inline
-T atomic_compare_exchange( volatile T * const dest, const T & compare,
-  typename Kokkos::Impl::enable_if< sizeof(T) == sizeof(int) , const T & >::type val )
-{
-  union U {
-    int i ;
-    T t ;
-    KOKKOS_INLINE_FUNCTION U() {};
-  } tmp ;
-
-#if defined( KOKKOS_ENABLE_RFO_PREFETCH )
-  _mm_prefetch( (const char*) dest, _MM_HINT_ET0 );
-#endif
-
-  tmp.i = __sync_val_compare_and_swap( (int*) dest , *((int*)&compare) , *((int*)&val) );
-  return tmp.t ;
+inline unsigned int atomic_compare_exchange(volatile unsigned int* const dest,
+                                            const unsigned int compare,
+                                            const unsigned int val) {
+  return __sync_val_compare_and_swap(dest, compare, val);
 }
 
-template < typename T >
-inline
-T atomic_compare_exchange( volatile T * const dest, const T & compare,
-  typename Kokkos::Impl::enable_if< sizeof(T) != sizeof(int) &&
-                                    sizeof(T) == sizeof(long) , const T & >::type val )
-{
-  union U {
-    long i ;
-    T t ;
-    KOKKOS_INLINE_FUNCTION U() {};
-  } tmp ;
-
-#if defined( KOKKOS_ENABLE_RFO_PREFETCH )
-  _mm_prefetch( (const char*) dest, _MM_HINT_ET0 );
-#endif
-
-  tmp.i = __sync_val_compare_and_swap( (long*) dest , *((long*)&compare) , *((long*)&val) );
-  return tmp.t ;
+inline unsigned long atomic_compare_exchange(volatile unsigned long* const dest,
+                                             const unsigned long compare,
+                                             const unsigned long val) {
+  return __sync_val_compare_and_swap(dest, compare, val);
 }
 
-#if defined( KOKKOS_ENABLE_ASM) && defined ( KOKKOS_ENABLE_ISA_X86_64 )
-template < typename T >
-inline
-T atomic_compare_exchange( volatile T * const dest, const T & compare,
-  typename Kokkos::Impl::enable_if< sizeof(T) != sizeof(int) &&
-                                    sizeof(T) != sizeof(long) &&
-                                    sizeof(T) == sizeof(Impl::cas128_t), const T & >::type val )
-{
-  union U {
-    Impl::cas128_t i ;
-    T t ;
-    KOKKOS_INLINE_FUNCTION U() {};
-  } tmp ;
-
-#if defined( KOKKOS_ENABLE_RFO_PREFETCH )
-  _mm_prefetch( (const char*) dest, _MM_HINT_ET0 );
 #endif
 
-  tmp.i = Impl::cas128( (Impl::cas128_t*) dest , *((Impl::cas128_t*)&compare) , *((Impl::cas128_t*)&val) );
-  return tmp.t ;
+template <typename T>
+inline T atomic_compare_exchange(
+    volatile T* const dest, const T& compare,
+    typename Kokkos::Impl::enable_if<sizeof(T) == sizeof(int), const T&>::type
+        val) {
+  union U {
+    int i;
+    T t;
+    KOKKOS_INLINE_FUNCTION U(){};
+  } tmp;
+
+#if defined(KOKKOS_ENABLE_RFO_PREFETCH)
+  _mm_prefetch((const char*)dest, _MM_HINT_ET0);
+#endif
+
+  tmp.i =
+      __sync_val_compare_and_swap((int*)dest, *((int*)&compare), *((int*)&val));
+  return tmp.t;
+}
+
+template <typename T>
+inline T atomic_compare_exchange(
+    volatile T* const dest, const T& compare,
+    typename Kokkos::Impl::enable_if<sizeof(T) != sizeof(int) &&
+                                         sizeof(T) == sizeof(long),
+                                     const T&>::type val) {
+  union U {
+    long i;
+    T t;
+    KOKKOS_INLINE_FUNCTION U(){};
+  } tmp;
+
+#if defined(KOKKOS_ENABLE_RFO_PREFETCH)
+  _mm_prefetch((const char*)dest, _MM_HINT_ET0);
+#endif
+
+  tmp.i = __sync_val_compare_and_swap((long*)dest, *((long*)&compare),
+                                      *((long*)&val));
+  return tmp.t;
+}
+
+#if defined(KOKKOS_ENABLE_ASM) && defined(KOKKOS_ENABLE_ISA_X86_64)
+template <typename T>
+inline T atomic_compare_exchange(
+    volatile T* const dest, const T& compare,
+    typename Kokkos::Impl::enable_if<sizeof(T) != sizeof(int) &&
+                                         sizeof(T) != sizeof(long) &&
+                                         sizeof(T) == sizeof(Impl::cas128_t),
+                                     const T&>::type val) {
+  union U {
+    Impl::cas128_t i;
+    T t;
+    KOKKOS_INLINE_FUNCTION U(){};
+  } tmp;
+
+#if defined(KOKKOS_ENABLE_RFO_PREFETCH)
+  _mm_prefetch((const char*)dest, _MM_HINT_ET0);
+#endif
+
+  tmp.i = Impl::cas128((Impl::cas128_t*)dest, *((Impl::cas128_t*)&compare),
+                       *((Impl::cas128_t*)&val));
+  return tmp.t;
 }
 #endif
 
-template < typename T >
-inline
-T atomic_compare_exchange( volatile T * const dest , const T compare ,
-    typename Kokkos::Impl::enable_if<
-                  ( sizeof(T) != 4 )
-               && ( sizeof(T) != 8 )
-            #if defined(KOKKOS_ENABLE_ASM) && defined ( KOKKOS_ENABLE_ISA_X86_64 )
-               && ( sizeof(T) != 16 )
-            #endif
-             , const T >::type& val )
-{
-#if defined( KOKKOS_ENABLE_RFO_PREFETCH )
-  _mm_prefetch( (const char*) dest, _MM_HINT_ET0 );
+template <typename T>
+inline T atomic_compare_exchange(
+    volatile T* const dest, const T compare,
+    typename Kokkos::Impl::enable_if<(sizeof(T) != 4) && (sizeof(T) != 8)
+#if defined(KOKKOS_ENABLE_ASM) && defined(KOKKOS_ENABLE_ISA_X86_64)
+                                         && (sizeof(T) != 16)
+#endif
+                                         ,
+                                     const T>::type& val) {
+#if defined(KOKKOS_ENABLE_RFO_PREFETCH)
+  _mm_prefetch((const char*)dest, _MM_HINT_ET0);
 #endif
 
-  while( !Impl::lock_address_host_space( (void*) dest ) );
+  while (!Impl::lock_address_host_space((void*)dest))
+    ;
   T return_val = *dest;
-  if( return_val == compare ) {
+  if (return_val == compare) {
     // Don't use the following line of code here:
     //
-    //const T tmp = *dest = val;
+    // const T tmp = *dest = val;
     //
     // Instead, put each assignment in its own statement.  This is
     // because the overload of T::operator= for volatile *this should
     // return void, not volatile T&.  See Kokkos #177:
     //
     // https://github.com/kokkos/kokkos/issues/177
-    *dest = val;
+    *dest       = val;
     const T tmp = *dest;
-    #ifndef KOKKOS_COMPILER_CLANG
-    (void) tmp;
-    #endif
+#ifndef KOKKOS_COMPILER_CLANG
+    (void)tmp;
+#endif
   }
-  Impl::unlock_address_host_space( (void*) dest );
+  Impl::unlock_address_host_space((void*)dest);
   return return_val;
 }
 //----------------------------------------------------------------------------
 
-#elif defined( KOKKOS_ENABLE_OPENMP_ATOMICS )
+#elif defined(KOKKOS_ENABLE_OPENMP_ATOMICS)
 
-template< typename T >
-KOKKOS_INLINE_FUNCTION
-T atomic_compare_exchange( volatile T * const dest, const T compare, const T val )
-{
+template <typename T>
+KOKKOS_INLINE_FUNCTION T atomic_compare_exchange(volatile T* const dest,
+                                                 const T compare, const T val) {
   T retval;
 #pragma omp critical
   {
     retval = dest[0];
-    if ( retval == compare )
-        dest[0] = val;
+    if (retval == compare) dest[0] = val;
   }
   return retval;
 }
 
-#elif defined( KOKKOS_ENABLE_SERIAL_ATOMICS )
+#elif defined(KOKKOS_ENABLE_SERIAL_ATOMICS)
 
-template< typename T >
-KOKKOS_INLINE_FUNCTION
-T atomic_compare_exchange( volatile T * const dest_v, const T compare, const T val )
-{
-  T* dest = const_cast<T*>(dest_v);
+template <typename T>
+KOKKOS_INLINE_FUNCTION T atomic_compare_exchange(volatile T* const dest_v,
+                                                 const T compare, const T val) {
+  T* dest  = const_cast<T*>(dest_v);
   T retval = *dest;
   if (retval == compare) *dest = val;
   return retval;
@@ -443,27 +441,25 @@ T atomic_compare_exchange( volatile T * const dest_v, const T compare, const T v
 
 #endif
 #endif
-#endif // !defined ROCM_ATOMICS
+#endif  // !defined ROCM_ATOMICS
 
 // dummy for non-CUDA Kokkos headers being processed by NVCC
 #if defined(__CUDA_ARCH__) && !defined(KOKKOS_ENABLE_CUDA)
 template <typename T>
-__inline__ __device__
-T atomic_compare_exchange(volatile T * const, const Kokkos::Impl::identity_t<T>, const Kokkos::Impl::identity_t<T>)
-{
+__inline__ __device__ T
+atomic_compare_exchange(volatile T* const, const Kokkos::Impl::identity_t<T>,
+                        const Kokkos::Impl::identity_t<T>) {
   return T();
 }
 #endif
 
 template <typename T>
-KOKKOS_INLINE_FUNCTION
-bool atomic_compare_exchange_strong(volatile T* const dest, const T compare, const T val)
-{
+KOKKOS_INLINE_FUNCTION bool atomic_compare_exchange_strong(
+    volatile T* const dest, const T compare, const T val) {
   return compare == atomic_compare_exchange(dest, compare, val);
 }
 //----------------------------------------------------------------------------
 
-} // namespace Kokkos
+}  // namespace Kokkos
 
 #endif
-

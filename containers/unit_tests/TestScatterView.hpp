@@ -48,348 +48,341 @@
 
 namespace Test {
 
-template <typename ExecSpace, typename Layout, int duplication, int contribution, int op>
+template <typename ExecSpace, typename Layout, int duplication,
+          int contribution, int op>
 struct test_scatter_view_impl_cls;
 
-template <typename ExecSpace, typename Layout, int duplication, int contribution>
-struct test_scatter_view_impl_cls<ExecSpace, Layout, duplication, contribution, Kokkos::Experimental::ScatterSum>   
-{
-public:   
-
-   typedef Kokkos::Experimental::ScatterView
-       < double*[3]
-       , Layout
-       , ExecSpace
-       , Kokkos::Experimental::ScatterSum
-       , duplication
-       , contribution
-        > scatter_view_type;
-
-   typedef Kokkos::View<double *[3], Layout, ExecSpace> orig_view_type; 
-
-
-   scatter_view_type scatter_view;
-   int scatterSize;
-
-   test_scatter_view_impl_cls(const scatter_view_type& view){
-      scatter_view = view;
-      scatterSize = 0;
-   }
-
-   void initialize(orig_view_type orig) {
-      auto host_view = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
-      Kokkos::fence();
-      for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0); ++i) {
-        host_view(i, 0) = 0.0;
-        host_view(i, 1) = 0.0;
-        host_view(i, 2) = 0.0;
-      }
-      Kokkos::fence();
-      Kokkos::deep_copy(orig, host_view);
-   }
-
-   void run_parallel(int n) {
-        scatterSize = n;
-        auto policy = Kokkos::RangePolicy<ExecSpace, int>(0, n);
-        Kokkos::parallel_for(policy, *this, "scatter_view_test: Sum");
-   }
-
-   KOKKOS_INLINE_FUNCTION
-   void operator()(int i) const {
-      auto scatter_access = scatter_view.access();
-      auto scatter_access_atomic = scatter_view.template access<Kokkos::Experimental::ScatterAtomic>();
-      for (int j = 0; j < 10; ++j) {
-        auto k = (i + j) % scatterSize;
-        scatter_access(k, 0) += 4.2;
-        scatter_access_atomic(k, 1) += 2.0;
-        scatter_access(k, 2) += 1.0;
-      }
-    }
-
-    void validateResults(orig_view_type orig) {
-      auto host_view = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
-      Kokkos::fence();
-      for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0); ++i) {
-        auto val0 = host_view(i, 0);
-        auto val1 = host_view(i, 1);
-        auto val2 = host_view(i, 2);
-        EXPECT_TRUE(std::fabs((val0 - 84.0) / 84.0) < 1e-15);
-        EXPECT_TRUE(std::fabs((val1 - 40.0) / 40.0) < 1e-15);
-        EXPECT_TRUE(std::fabs((val2 - 20.0) / 20.0) < 1e-15);
-      }
-    }
-};
-
-
-template <typename ExecSpace, typename Layout, int duplication, int contribution>
-struct test_scatter_view_impl_cls<ExecSpace, Layout, duplication, contribution, Kokkos::Experimental::ScatterProd>   
-{
-public:   
-
-   typedef Kokkos::Experimental::ScatterView
-       < double*[3]
-       , Layout
-       , ExecSpace
-       , Kokkos::Experimental::ScatterProd
-       , duplication
-       , contribution
-        > scatter_view_type;
-
-   typedef Kokkos::View<double *[3], Layout, ExecSpace> orig_view_type; 
-
-
-   scatter_view_type scatter_view;
-   int scatterSize;
-
-   test_scatter_view_impl_cls(const scatter_view_type& view){
-      scatter_view = view;
-      scatterSize = 0;
-   }
-
-   void initialize(orig_view_type orig) {
-      auto host_view = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
-      Kokkos::fence();
-      for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0); ++i) {
-        host_view(i, 0) = 1.0;
-        host_view(i, 1) = 1.0;
-        host_view(i, 2) = 1.0;
-      }
-      Kokkos::fence();
-      Kokkos::deep_copy(orig, host_view);
-   }
-
-   void run_parallel(int n) {
-        scatterSize = n;
-        auto policy = Kokkos::RangePolicy<ExecSpace, int>(0, n);
-        Kokkos::parallel_for(policy, *this, "scatter_view_test: Prod");
-   }
-
-   KOKKOS_INLINE_FUNCTION
-   void operator()(int i) const {
-      auto scatter_access = scatter_view.access();
-      auto scatter_access_atomic = scatter_view.template access<Kokkos::Experimental::ScatterAtomic>();
-      for (int j = 0; j < 4; ++j) {
-        auto k = (i + j) % scatterSize;
-        scatter_access(k, 0) *= 4.0;
-        scatter_access_atomic(k, 1) *= 2.0;
-        scatter_access(k, 2) *= 1.0;
-      }
-    }
-
-    void validateResults(orig_view_type orig) {
-      auto host_view = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
-      Kokkos::fence();
-      for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0); ++i) {
-        auto val0 = host_view(i, 0);
-        auto val1 = host_view(i, 1);
-        auto val2 = host_view(i, 2);
-        //printf("returned values: %le, %le, %le \n", val0, val1, val2);
-        EXPECT_TRUE(std::fabs((val0 - 65536.0) / 65536.0) < 1e-15);
-        EXPECT_TRUE(std::fabs((val1 - 256.0) / 256.0) < 1e-15);
-        EXPECT_TRUE(std::fabs((val2 - 1.0) / 1.0) < 1e-15);
-      }
-    }
-};
-
-
-template <typename ExecSpace, typename Layout, int duplication, int contribution>
-struct test_scatter_view_impl_cls<ExecSpace, Layout, duplication, contribution, Kokkos::Experimental::ScatterMin>   
-{
-public:   
-
-   typedef Kokkos::Experimental::ScatterView
-       < double*[3]
-       , Layout
-       , ExecSpace
-       , Kokkos::Experimental::ScatterMin
-       , duplication
-       , contribution
-        > scatter_view_type;
-
-   typedef Kokkos::View<double *[3], Layout, ExecSpace> orig_view_type; 
-
-
-   scatter_view_type scatter_view;
-   int scatterSize;
-
-   test_scatter_view_impl_cls(const scatter_view_type& view){
-      scatter_view = view;
-      scatterSize = 0;
-   }
-
-   void initialize(orig_view_type orig) {
-      auto host_view = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
-      Kokkos::fence();
-      for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0); ++i) {
-        host_view(i, 0) = 999999.0;
-        host_view(i, 1) = 999999.0;
-        host_view(i, 2) = 999999.0;
-      }
-      Kokkos::fence();
-      Kokkos::deep_copy(orig, host_view);
-   }
-
-   void run_parallel(int n) {
-        scatterSize = n;
-        auto policy = Kokkos::RangePolicy<ExecSpace, int>(0, n);
-        Kokkos::parallel_for(policy, *this, "scatter_view_test: Prod");
-   }
-
-   KOKKOS_INLINE_FUNCTION
-   void operator()(int i) const {
-      auto scatter_access = scatter_view.access();
-      auto scatter_access_atomic = scatter_view.template access<Kokkos::Experimental::ScatterAtomic>();
-      for (int j = 0; j < 4; ++j) {
-        auto k = (i + j) % scatterSize;
-        scatter_access(k, 0).update((double)(j+1)*4);
-        scatter_access_atomic(k, 1).update((double)(j+1)*2.0);
-        scatter_access(k, 2).update((double)(j+1)*1.0);
-      }
-    }
-
-    void validateResults(orig_view_type orig) {
-      auto host_view = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
-      Kokkos::fence();
-      for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0); ++i) {
-        auto val0 = host_view(i, 0);
-        auto val1 = host_view(i, 1);
-        auto val2 = host_view(i, 2);
-        //printf("returned values: %le, %le, %le \n", val0, val1, val2);
-        EXPECT_TRUE(std::fabs((val0 - 4.0) / 4.0) < 1e-15);
-        EXPECT_TRUE(std::fabs((val1 - 2.0) / 2.0) < 1e-15);
-        EXPECT_TRUE(std::fabs((val2 - 1.0) / 1.0) < 1e-15);
-      }
-    }
-};
-
-
-template <typename ExecSpace, typename Layout, int duplication, int contribution>
-struct test_scatter_view_impl_cls<ExecSpace, Layout, duplication, contribution, Kokkos::Experimental::ScatterMax>   
-{
-public:   
-
-   typedef Kokkos::Experimental::ScatterView
-       < double*[3]
-       , Layout
-       , ExecSpace
-       , Kokkos::Experimental::ScatterMax
-       , duplication
-       , contribution
-        > scatter_view_type;
-
-   typedef Kokkos::View<double *[3], Layout, ExecSpace> orig_view_type; 
-
-
-   scatter_view_type scatter_view;
-   int scatterSize;
-
-   test_scatter_view_impl_cls(const scatter_view_type& view){
-      scatter_view = view;
-      scatterSize = 0;
-   }
-
-   void initialize(orig_view_type orig) {
-      auto host_view = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
-      Kokkos::fence();
-      for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0); ++i) {
-        host_view(i, 0) = 0.0;
-        host_view(i, 1) = 0.0;
-        host_view(i, 2) = 0.0;
-      }
-      Kokkos::fence();
-      Kokkos::deep_copy(orig, host_view);
-   }
-
-   void run_parallel(int n) {
-        scatterSize = n;
-        auto policy = Kokkos::RangePolicy<ExecSpace, int>(0, n);
-        Kokkos::parallel_for(policy, *this, "scatter_view_test: Prod");
-   }
-
-   KOKKOS_INLINE_FUNCTION
-   void operator()(int i) const {
-      auto scatter_access = scatter_view.access();
-      auto scatter_access_atomic = scatter_view.template access<Kokkos::Experimental::ScatterAtomic>();
-      for (int j = 0; j < 4; ++j) {
-        auto k = (i + j) % scatterSize;
-        scatter_access(k, 0).update((double)(j+1)*4);
-        scatter_access_atomic(k, 1).update((double)(j+1)*2.0);
-        scatter_access(k, 2).update((double)(j+1)*1.0);
-      }
-    }
-
-    void validateResults(orig_view_type orig) {
-      auto host_view = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
-      Kokkos::fence();
-      for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0); ++i) {
-        auto val0 = host_view(i, 0);
-        auto val1 = host_view(i, 1);
-        auto val2 = host_view(i, 2);
-        //printf("returned values: %le, %le, %le \n", val0, val1, val2);
-        EXPECT_TRUE(std::fabs((val0 - 16.0) / 16.0) < 1e-15);
-        EXPECT_TRUE(std::fabs((val1 - 8.0) / 8.0) < 1e-15);
-        EXPECT_TRUE(std::fabs((val2 - 4.0) / 4.0) < 1e-15);
-      }
-    }
-};
-
-
-
-template <typename ExecSpace, typename Layout, int duplication, int contribution, int op>
-struct test_scatter_view_config
-{
+template <typename ExecSpace, typename Layout, int duplication,
+          int contribution>
+struct test_scatter_view_impl_cls<ExecSpace, Layout, duplication, contribution,
+                                  Kokkos::Experimental::ScatterSum> {
  public:
-   typedef typename test_scatter_view_impl_cls<ExecSpace, Layout, 
-         duplication, contribution, op>::scatter_view_type scatter_view_def;
-   typedef typename test_scatter_view_impl_cls<ExecSpace, Layout, 
-         duplication, contribution, op>::orig_view_type orig_view_def;
-   scatter_view_def scatter_view;
+  typedef Kokkos::Experimental::ScatterView<double * [3], Layout, ExecSpace,
+                                            Kokkos::Experimental::ScatterSum,
+                                            duplication, contribution>
+      scatter_view_type;
 
-   test_scatter_view_config() {
-   }
+  typedef Kokkos::View<double * [3], Layout, ExecSpace> orig_view_type;
 
-   void run_test(int n)
-   {
+  scatter_view_type scatter_view;
+  int scatterSize;
 
-     orig_view_def original_view("original_view", n);
-     scatter_view = Kokkos::Experimental::create_scatter_view
-       < op
-       , duplication
-       , contribution
-       > (original_view);
+  test_scatter_view_impl_cls(const scatter_view_type& view) {
+    scatter_view = view;
+    scatterSize  = 0;
+  }
 
-     test_scatter_view_impl_cls<ExecSpace, Layout, duplication, contribution, op> scatter_view_test_impl(scatter_view);
-     scatter_view_test_impl.initialize(original_view);
-     scatter_view_test_impl.run_parallel(n);
+  void initialize(orig_view_type orig) {
+    auto host_view =
+        Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
+    Kokkos::fence();
+    for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0);
+         ++i) {
+      host_view(i, 0) = 0.0;
+      host_view(i, 1) = 0.0;
+      host_view(i, 2) = 0.0;
+    }
+    Kokkos::fence();
+    Kokkos::deep_copy(orig, host_view);
+  }
 
-     Kokkos::Experimental::contribute(original_view, scatter_view);
-     scatter_view.reset_except(original_view);
+  void run_parallel(int n) {
+    scatterSize = n;
+    auto policy = Kokkos::RangePolicy<ExecSpace, int>(0, n);
+    Kokkos::parallel_for(policy, *this, "scatter_view_test: Sum");
+  }
 
-     scatter_view_test_impl.run_parallel(n);
+  KOKKOS_INLINE_FUNCTION
+  void operator()(int i) const {
+    auto scatter_access = scatter_view.access();
+    auto scatter_access_atomic =
+        scatter_view.template access<Kokkos::Experimental::ScatterAtomic>();
+    for (int j = 0; j < 10; ++j) {
+      auto k = (i + j) % scatterSize;
+      scatter_access(k, 0) += 4.2;
+      scatter_access_atomic(k, 1) += 2.0;
+      scatter_access(k, 2) += 1.0;
+    }
+  }
 
-     Kokkos::Experimental::contribute(original_view, scatter_view);
-     Kokkos::fence();
-
-     scatter_view_test_impl.validateResults(original_view);
-
-     {
-        scatter_view_def persistent_view("persistent", n);
-        auto result_view = persistent_view.subview();
-        contribute(result_view, persistent_view);
-     }
-   }
-
+  void validateResults(orig_view_type orig) {
+    auto host_view =
+        Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
+    Kokkos::fence();
+    for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0);
+         ++i) {
+      auto val0 = host_view(i, 0);
+      auto val1 = host_view(i, 1);
+      auto val2 = host_view(i, 2);
+      EXPECT_TRUE(std::fabs((val0 - 84.0) / 84.0) < 1e-15);
+      EXPECT_TRUE(std::fabs((val1 - 40.0) / 40.0) < 1e-15);
+      EXPECT_TRUE(std::fabs((val2 - 20.0) / 20.0) < 1e-15);
+    }
+  }
 };
 
+template <typename ExecSpace, typename Layout, int duplication,
+          int contribution>
+struct test_scatter_view_impl_cls<ExecSpace, Layout, duplication, contribution,
+                                  Kokkos::Experimental::ScatterProd> {
+ public:
+  typedef Kokkos::Experimental::ScatterView<double * [3], Layout, ExecSpace,
+                                            Kokkos::Experimental::ScatterProd,
+                                            duplication, contribution>
+      scatter_view_type;
+
+  typedef Kokkos::View<double * [3], Layout, ExecSpace> orig_view_type;
+
+  scatter_view_type scatter_view;
+  int scatterSize;
+
+  test_scatter_view_impl_cls(const scatter_view_type& view) {
+    scatter_view = view;
+    scatterSize  = 0;
+  }
+
+  void initialize(orig_view_type orig) {
+    auto host_view =
+        Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
+    Kokkos::fence();
+    for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0);
+         ++i) {
+      host_view(i, 0) = 1.0;
+      host_view(i, 1) = 1.0;
+      host_view(i, 2) = 1.0;
+    }
+    Kokkos::fence();
+    Kokkos::deep_copy(orig, host_view);
+  }
+
+  void run_parallel(int n) {
+    scatterSize = n;
+    auto policy = Kokkos::RangePolicy<ExecSpace, int>(0, n);
+    Kokkos::parallel_for(policy, *this, "scatter_view_test: Prod");
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void operator()(int i) const {
+    auto scatter_access = scatter_view.access();
+    auto scatter_access_atomic =
+        scatter_view.template access<Kokkos::Experimental::ScatterAtomic>();
+    for (int j = 0; j < 4; ++j) {
+      auto k = (i + j) % scatterSize;
+      scatter_access(k, 0) *= 4.0;
+      scatter_access_atomic(k, 1) *= 2.0;
+      scatter_access(k, 2) *= 1.0;
+    }
+  }
+
+  void validateResults(orig_view_type orig) {
+    auto host_view =
+        Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
+    Kokkos::fence();
+    for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0);
+         ++i) {
+      auto val0 = host_view(i, 0);
+      auto val1 = host_view(i, 1);
+      auto val2 = host_view(i, 2);
+      // printf("returned values: %le, %le, %le \n", val0, val1, val2);
+      EXPECT_TRUE(std::fabs((val0 - 65536.0) / 65536.0) < 1e-15);
+      EXPECT_TRUE(std::fabs((val1 - 256.0) / 256.0) < 1e-15);
+      EXPECT_TRUE(std::fabs((val2 - 1.0) / 1.0) < 1e-15);
+    }
+  }
+};
+
+template <typename ExecSpace, typename Layout, int duplication,
+          int contribution>
+struct test_scatter_view_impl_cls<ExecSpace, Layout, duplication, contribution,
+                                  Kokkos::Experimental::ScatterMin> {
+ public:
+  typedef Kokkos::Experimental::ScatterView<double * [3], Layout, ExecSpace,
+                                            Kokkos::Experimental::ScatterMin,
+                                            duplication, contribution>
+      scatter_view_type;
+
+  typedef Kokkos::View<double * [3], Layout, ExecSpace> orig_view_type;
+
+  scatter_view_type scatter_view;
+  int scatterSize;
+
+  test_scatter_view_impl_cls(const scatter_view_type& view) {
+    scatter_view = view;
+    scatterSize  = 0;
+  }
+
+  void initialize(orig_view_type orig) {
+    auto host_view =
+        Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
+    Kokkos::fence();
+    for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0);
+         ++i) {
+      host_view(i, 0) = 999999.0;
+      host_view(i, 1) = 999999.0;
+      host_view(i, 2) = 999999.0;
+    }
+    Kokkos::fence();
+    Kokkos::deep_copy(orig, host_view);
+  }
+
+  void run_parallel(int n) {
+    scatterSize = n;
+    auto policy = Kokkos::RangePolicy<ExecSpace, int>(0, n);
+    Kokkos::parallel_for(policy, *this, "scatter_view_test: Prod");
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void operator()(int i) const {
+    auto scatter_access = scatter_view.access();
+    auto scatter_access_atomic =
+        scatter_view.template access<Kokkos::Experimental::ScatterAtomic>();
+    for (int j = 0; j < 4; ++j) {
+      auto k = (i + j) % scatterSize;
+      scatter_access(k, 0).update((double)(j + 1) * 4);
+      scatter_access_atomic(k, 1).update((double)(j + 1) * 2.0);
+      scatter_access(k, 2).update((double)(j + 1) * 1.0);
+    }
+  }
+
+  void validateResults(orig_view_type orig) {
+    auto host_view =
+        Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
+    Kokkos::fence();
+    for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0);
+         ++i) {
+      auto val0 = host_view(i, 0);
+      auto val1 = host_view(i, 1);
+      auto val2 = host_view(i, 2);
+      // printf("returned values: %le, %le, %le \n", val0, val1, val2);
+      EXPECT_TRUE(std::fabs((val0 - 4.0) / 4.0) < 1e-15);
+      EXPECT_TRUE(std::fabs((val1 - 2.0) / 2.0) < 1e-15);
+      EXPECT_TRUE(std::fabs((val2 - 1.0) / 1.0) < 1e-15);
+    }
+  }
+};
+
+template <typename ExecSpace, typename Layout, int duplication,
+          int contribution>
+struct test_scatter_view_impl_cls<ExecSpace, Layout, duplication, contribution,
+                                  Kokkos::Experimental::ScatterMax> {
+ public:
+  typedef Kokkos::Experimental::ScatterView<double * [3], Layout, ExecSpace,
+                                            Kokkos::Experimental::ScatterMax,
+                                            duplication, contribution>
+      scatter_view_type;
+
+  typedef Kokkos::View<double * [3], Layout, ExecSpace> orig_view_type;
+
+  scatter_view_type scatter_view;
+  int scatterSize;
+
+  test_scatter_view_impl_cls(const scatter_view_type& view) {
+    scatter_view = view;
+    scatterSize  = 0;
+  }
+
+  void initialize(orig_view_type orig) {
+    auto host_view =
+        Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
+    Kokkos::fence();
+    for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0);
+         ++i) {
+      host_view(i, 0) = 0.0;
+      host_view(i, 1) = 0.0;
+      host_view(i, 2) = 0.0;
+    }
+    Kokkos::fence();
+    Kokkos::deep_copy(orig, host_view);
+  }
+
+  void run_parallel(int n) {
+    scatterSize = n;
+    auto policy = Kokkos::RangePolicy<ExecSpace, int>(0, n);
+    Kokkos::parallel_for(policy, *this, "scatter_view_test: Prod");
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void operator()(int i) const {
+    auto scatter_access = scatter_view.access();
+    auto scatter_access_atomic =
+        scatter_view.template access<Kokkos::Experimental::ScatterAtomic>();
+    for (int j = 0; j < 4; ++j) {
+      auto k = (i + j) % scatterSize;
+      scatter_access(k, 0).update((double)(j + 1) * 4);
+      scatter_access_atomic(k, 1).update((double)(j + 1) * 2.0);
+      scatter_access(k, 2).update((double)(j + 1) * 1.0);
+    }
+  }
+
+  void validateResults(orig_view_type orig) {
+    auto host_view =
+        Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), orig);
+    Kokkos::fence();
+    for (typename decltype(host_view)::size_type i = 0; i < host_view.extent(0);
+         ++i) {
+      auto val0 = host_view(i, 0);
+      auto val1 = host_view(i, 1);
+      auto val2 = host_view(i, 2);
+      // printf("returned values: %le, %le, %le \n", val0, val1, val2);
+      EXPECT_TRUE(std::fabs((val0 - 16.0) / 16.0) < 1e-15);
+      EXPECT_TRUE(std::fabs((val1 - 8.0) / 8.0) < 1e-15);
+      EXPECT_TRUE(std::fabs((val2 - 4.0) / 4.0) < 1e-15);
+    }
+  }
+};
+
+template <typename ExecSpace, typename Layout, int duplication,
+          int contribution, int op>
+struct test_scatter_view_config {
+ public:
+  typedef
+      typename test_scatter_view_impl_cls<ExecSpace, Layout, duplication,
+                                          contribution, op>::scatter_view_type
+          scatter_view_def;
+  typedef typename test_scatter_view_impl_cls<ExecSpace, Layout, duplication,
+                                              contribution, op>::orig_view_type
+      orig_view_def;
+  scatter_view_def scatter_view;
+
+  test_scatter_view_config() {}
+
+  void run_test(int n) {
+    orig_view_def original_view("original_view", n);
+    scatter_view =
+        Kokkos::Experimental::create_scatter_view<op, duplication,
+                                                  contribution>(original_view);
+
+    test_scatter_view_impl_cls<ExecSpace, Layout, duplication, contribution, op>
+        scatter_view_test_impl(scatter_view);
+    scatter_view_test_impl.initialize(original_view);
+    scatter_view_test_impl.run_parallel(n);
+
+    Kokkos::Experimental::contribute(original_view, scatter_view);
+    scatter_view.reset_except(original_view);
+
+    scatter_view_test_impl.run_parallel(n);
+
+    Kokkos::Experimental::contribute(original_view, scatter_view);
+    Kokkos::fence();
+
+    scatter_view_test_impl.validateResults(original_view);
+
+    {
+      scatter_view_def persistent_view("persistent", n);
+      auto result_view = persistent_view.subview();
+      contribute(result_view, persistent_view);
+    }
+  }
+};
 
 template <typename ExecSpace, int ScatterType>
 struct TestDuplicatedScatterView {
   TestDuplicatedScatterView(int n) {
     // ScatterSum test
-    test_scatter_view_config<ExecSpace, Kokkos::LayoutRight,
-      Kokkos::Experimental::ScatterDuplicated,
-      Kokkos::Experimental::ScatterNonAtomic, 
-      ScatterType> test_sv_config;
+    test_scatter_view_config<
+        ExecSpace, Kokkos::LayoutRight, Kokkos::Experimental::ScatterDuplicated,
+        Kokkos::Experimental::ScatterNonAtomic, ScatterType>
+        test_sv_config;
     test_sv_config.run_test(n);
   }
 };
@@ -399,8 +392,7 @@ struct TestDuplicatedScatterView {
 // UniqueToken can support it
 template <int ScatterType>
 struct TestDuplicatedScatterView<Kokkos::Cuda, ScatterType> {
-  TestDuplicatedScatterView(int) {
-  }
+  TestDuplicatedScatterView(int) {}
 };
 #endif
 
@@ -409,14 +401,12 @@ struct TestDuplicatedScatterView<Kokkos::Cuda, ScatterType> {
 // UniqueToken can support it
 template <int ScatterType>
 struct TestDuplicatedScatterView<Kokkos::Experimental::ROCm, ScatterType> {
-  TestDuplicatedScatterView(int) {
-  }
+  TestDuplicatedScatterView(int) {}
 };
 #endif
 
 template <typename ExecSpace, int ScatterType>
-void test_scatter_view(int n)
-{
+void test_scatter_view(int n) {
   // all of these configurations should compile okay, but only some of them are
   // correct and/or sensible in terms of memory use
   Kokkos::Experimental::UniqueToken<ExecSpace> unique_token{ExecSpace()};
@@ -426,29 +416,30 @@ void test_scatter_view(int n)
   // we also test OpenMP with one thread: LAMMPS cares about that)
   if (unique_token.size() == 1) {
     test_scatter_view_config<ExecSpace, Kokkos::LayoutRight,
-      Kokkos::Experimental::ScatterNonDuplicated,
-      Kokkos::Experimental::ScatterNonAtomic,
-      ScatterType> test_sv_config;
+                             Kokkos::Experimental::ScatterNonDuplicated,
+                             Kokkos::Experimental::ScatterNonAtomic,
+                             ScatterType>
+        test_sv_config;
     test_sv_config.run_test(n);
   }
 #ifdef KOKKOS_ENABLE_SERIAL
   if (!std::is_same<ExecSpace, Kokkos::Serial>::value) {
 #endif
-  test_scatter_view_config<ExecSpace, Kokkos::LayoutRight,
-    Kokkos::Experimental::ScatterNonDuplicated,
-    Kokkos::Experimental::ScatterAtomic,
-    ScatterType> test_sv_config;
-  test_sv_config.run_test(n);
+    test_scatter_view_config<ExecSpace, Kokkos::LayoutRight,
+                             Kokkos::Experimental::ScatterNonDuplicated,
+                             Kokkos::Experimental::ScatterAtomic, ScatterType>
+        test_sv_config;
+    test_sv_config.run_test(n);
 #ifdef KOKKOS_ENABLE_SERIAL
   }
 #endif
   fflush(stdout);
-  //printf("running duplicate test \n");
+  // printf("running duplicate test \n");
   TestDuplicatedScatterView<ExecSpace, ScatterType> duptest(n);
-  //printf("duplicate test finished \n");
+  // printf("duplicate test finished \n");
 }
 
-TEST_F( TEST_CATEGORY, scatterview) {
+TEST_F(TEST_CATEGORY, scatterview) {
 #ifndef KOKKOS_ENABLE_ROCM
   test_scatter_view<TEST_EXECSPACE, Kokkos::Experimental::ScatterSum>(10);
   test_scatter_view<TEST_EXECSPACE, Kokkos::Experimental::ScatterProd>(10);
@@ -460,16 +451,15 @@ TEST_F( TEST_CATEGORY, scatterview) {
   test_scatter_view<TEST_EXECSPACE, Kokkos::Experimental::ScatterMin>(100000);
   test_scatter_view<TEST_EXECSPACE, Kokkos::Experimental::ScatterMax>(100000);
 #else
-  test_scatter_view<TEST_EXECSPACE,Kokkos::Experimental::ScatterSum>(10000000);
-  test_scatter_view<TEST_EXECSPACE,Kokkos::Experimental::ScatterProd>(10000000);
-  test_scatter_view<TEST_EXECSPACE,Kokkos::Experimental::ScatterMin>(10000000);
-  test_scatter_view<TEST_EXECSPACE,Kokkos::Experimental::ScatterMax>(10000000);
+  test_scatter_view<TEST_EXECSPACE, Kokkos::Experimental::ScatterSum>(10000000);
+  test_scatter_view<TEST_EXECSPACE, Kokkos::Experimental::ScatterProd>(
+      10000000);
+  test_scatter_view<TEST_EXECSPACE, Kokkos::Experimental::ScatterMin>(10000000);
+  test_scatter_view<TEST_EXECSPACE, Kokkos::Experimental::ScatterMax>(10000000);
 #endif
 #endif
 }
 
-} // namespace Test
+}  // namespace Test
 
-#endif //KOKKOS_TEST_UNORDERED_MAP_HPP
-
-
+#endif  // KOKKOS_TEST_UNORDERED_MAP_HPP

@@ -45,8 +45,7 @@
 #define KOKKOS_IMPL_TASKQUEUEMEMORYMANAGER_HPP
 
 #include <Kokkos_Macros.hpp>
-#if defined( KOKKOS_ENABLE_TASKDAG )
-
+#if defined(KOKKOS_ENABLE_TASKDAG)
 
 #include <Kokkos_TaskScheduler_fwd.hpp>
 #include <Kokkos_Core_fwd.hpp>
@@ -67,38 +66,31 @@
 
 #include <Kokkos_EmuSpace.hpp>
 
-
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
 
 namespace Kokkos {
 namespace Impl {
 
-template <
-  class ExecSpace,
-  class MemorySpace,
-  class MemoryPool = Kokkos::MemoryPool<Kokkos::Device<ExecSpace, MemorySpace>>
->
-class TaskQueueMemoryManager
-  : public TaskQueueBase
-{
-public:
-
-  using execution_space = ExecSpace;
-  using memory_space = MemorySpace;
-  using device_type = Kokkos::Device<execution_space, memory_space>;
-  using memory_pool = MemoryPool;
+template <class ExecSpace, class MemorySpace,
+          class MemoryPool =
+              Kokkos::MemoryPool<Kokkos::Device<ExecSpace, MemorySpace>>>
+class TaskQueueMemoryManager : public TaskQueueBase {
+ public:
+  using execution_space      = ExecSpace;
+  using memory_space         = MemorySpace;
+  using device_type          = Kokkos::Device<execution_space, memory_space>;
+  using memory_pool          = MemoryPool;
   using allocation_size_type = size_t;
 
-protected:
-
+ protected:
   memory_pool m_pool;
-  
-private:
+
+ private:
   // TODO @tasking @generalization DSH re-enable this with a flag in the type
-  //long m_accum_alloc = 0;
+  // long m_accum_alloc = 0;
   int m_count_alloc = 0;
-  int m_max_alloc = 0;
+  int m_max_alloc   = 0;
 
   struct _allocation_result {
     bool success;
@@ -106,141 +98,131 @@ private:
   };
 
   KOKKOS_INLINE_FUNCTION
-  _allocation_result
-  _do_pool_allocate(allocation_size_type requested_size, size_t add_info) {
-    // KOKKOS_EXPECTS(requested_size >= 0); generates a warning when allocation_size_type is unsigned
-    if(requested_size == 0 ) {
-      return { true, nullptr };
-    }
-    else {
-      void* data = m_pool.allocate(static_cast<size_t>(requested_size), 1, add_info);
-      //printf("pool data allocated 0x%lx, %d\n", data, add_info);
-      //fflush(stdout);
+  _allocation_result _do_pool_allocate(allocation_size_type requested_size,
+                                       size_t add_info) {
+    // KOKKOS_EXPECTS(requested_size >= 0); generates a warning when
+    // allocation_size_type is unsigned
+    if (requested_size == 0) {
+      return {true, nullptr};
+    } else {
+      void* data =
+          m_pool.allocate(static_cast<size_t>(requested_size), 1, add_info);
+      // printf("pool data allocated 0x%lx, %d\n", data, add_info);
+      // fflush(stdout);
 
-      //Kokkos::atomic_increment(&m_accum_alloc); // memory_order_relaxed
-      Kokkos::atomic_increment(&m_count_alloc); // memory_order_relaxed
-      // TODO @tasking @minor DSH make this thread safe? (otherwise, it's just an approximation, which is probably fine...)
-      if(m_max_alloc < m_count_alloc) m_max_alloc = m_count_alloc;
+      // Kokkos::atomic_increment(&m_accum_alloc); // memory_order_relaxed
+      Kokkos::atomic_increment(&m_count_alloc);  // memory_order_relaxed
+      // TODO @tasking @minor DSH make this thread safe? (otherwise, it's just
+      // an approximation, which is probably fine...)
+      if (m_max_alloc < m_count_alloc) m_max_alloc = m_count_alloc;
 
-      return { data != nullptr, data };
+      return {data != nullptr, data};
     }
   }
 
   template <class T, class... Args>
-  KOKKOS_INLINE_FUNCTION
-  T*
-  _do_contruct(void* allocated, allocation_size_type allocated_size, Args&&... args) {
-
-    static_assert(
-      std::is_base_of<PoolAllocatedObjectBase<int32_t>, T>::value,
-      "TaskQueueMemoryManager can only allocate objects with PoolAllocatedObjectBase base class"
-    );
+  KOKKOS_INLINE_FUNCTION T* _do_contruct(void* allocated,
+                                         allocation_size_type allocated_size,
+                                         Args&&... args) {
+    static_assert(std::is_base_of<PoolAllocatedObjectBase<int32_t>, T>::value,
+                  "TaskQueueMemoryManager can only allocate objects with "
+                  "PoolAllocatedObjectBase base class");
 
     // TODO @tasking DSH figure out why this isn't working
-    //static_assert(
+    // static_assert(
     //  std::is_constructible<T, Args..., int32_t>::value,
-    //  "TaskQueueMemoryManager can't construct object of the requested type from the "
-    //  " allocation size and the given arguments"
+    //  "TaskQueueMemoryManager can't construct object of the requested type
+    //  from the " " allocation size and the given arguments"
     //);
-    //printf("constructing object from pointer: %08x\n", (unsigned long)allocated);
-    //Kokkos::Experimental::print_pointer( NODE_ID(), allocated, "task object" );
+    // printf("constructing object from pointer: %08x\n", (unsigned
+    // long)allocated); Kokkos::Experimental::print_pointer( NODE_ID(),
+    // allocated, "task object" );
 
-    auto rv = new (allocated) T(
-      std::forward<Args>(args)...,
-      allocated_size
-    );
+    auto rv = new (allocated) T(std::forward<Args>(args)..., allocated_size);
 
     // It feels like there should be a way to check this at compile-time
     KOKKOS_ASSERT(
-      (intptr_t)(rv) == (intptr_t)(static_cast<PoolAllocatedObjectBase<int32_t>*>(rv))
-        && "PoolAllocatedObjectBase must be the first base class of the allocated type"
-    );
-    //printf("task object constructed\n");
-    //fflush(stdout);
+        (intptr_t)(rv) ==
+            (intptr_t)(static_cast<PoolAllocatedObjectBase<int32_t>*>(rv)) &&
+        "PoolAllocatedObjectBase must be the first base class of the allocated "
+        "type");
+    // printf("task object constructed\n");
+    // fflush(stdout);
     return rv;
-
   }
 
+ public:
+  explicit TaskQueueMemoryManager(TaskQueueMemoryManager const& rhs)
+      : m_pool(rhs.m_pool) {}
 
-public:
+  explicit TaskQueueMemoryManager(TaskQueueMemoryManager&& rhs)
+      : m_pool(std::move(rhs.m_pool)) {}
 
-  explicit
-  TaskQueueMemoryManager(TaskQueueMemoryManager const& rhs)
-    : m_pool(rhs.m_pool) {}
-
-  explicit
-  TaskQueueMemoryManager(TaskQueueMemoryManager && rhs)
-    : m_pool(std::move(rhs.m_pool)) {}
-
-  explicit
-  TaskQueueMemoryManager(memory_pool const& pool)
-    : m_pool(pool)
-  { //printf("task queue memory manager \n"); fflush(stdout);
+  explicit TaskQueueMemoryManager(memory_pool const& pool)
+      : m_pool(
+            pool) {  // printf("task queue memory manager \n"); fflush(stdout);
   }
-
 
   template <class T, class... Args>
-  KOKKOS_FUNCTION
-  T*
-  allocate_and_construct(size_t add_info, Args&&... args)
-    // requires
-    //   std::is_base_of_v<PoolAllocatedObjectBase<typename memory_pool::size_type>, T>
-    //     && std::is_constructible_v<T, Args&&..., allocation_size_type>
+  KOKKOS_FUNCTION T* allocate_and_construct(size_t add_info, Args&&... args)
+  // requires
+  //   std::is_base_of_v<PoolAllocatedObjectBase<typename
+  //   memory_pool::size_type>, T>
+  //     && std::is_constructible_v<T, Args&&..., allocation_size_type>
   {
     constexpr auto allocation_size = sizeof(T);
 
     auto result = _do_pool_allocate(allocation_size, add_info);
 
     KOKKOS_ASSERT(result.success && "Memory allocation failure");
-    
-    //printf("constructing task from pool: %08x, %d \n", result.pointer, allocation_size);
 
-    auto rv = _do_contruct<T>(result.pointer, allocation_size, std::forward<Args>(args)...);
-    
-    //printf("task from pool: %08x, %08x \n", intptr_t(rv), alignof(T));
-    //fflush(stdout);
-    //KOKKOS_ENSURES(intptr_t(rv) % alignof(T) == 0 && "alignment not preserved!");
+    // printf("constructing task from pool: %08x, %d \n", result.pointer,
+    // allocation_size);
 
-    //printf("returning constructed task...\n");
-    //fflush(stdout);
+    auto rv = _do_contruct<T>(result.pointer, allocation_size,
+                              std::forward<Args>(args)...);
+
+    // printf("task from pool: %08x, %08x \n", intptr_t(rv), alignof(T));
+    // fflush(stdout);
+    // KOKKOS_ENSURES(intptr_t(rv) % alignof(T) == 0 && "alignment not
+    // preserved!");
+
+    // printf("returning constructed task...\n");
+    // fflush(stdout);
     return rv;
   }
 
   template <class T, class VLAValueType, class... Args>
-  KOKKOS_INLINE_FUNCTION
-  T*
-  allocate_and_construct_with_vla_emulation(
-    allocation_size_type n_vla_entries,
-    const int add_info,
-    Args&&... args
-  )
-    // requires
-    //   std::is_base_of_v<PoolAllocatedObjectBase<typename memory_pool::size_type>, T>
-    //     && std::is_base_of<ObjectWithVLAEmulation<T, VLAValueType>, T>::value
-    //     && std::is_constructible_v<T, allocation_size_type, Args&&...>
+  KOKKOS_INLINE_FUNCTION T* allocate_and_construct_with_vla_emulation(
+      allocation_size_type n_vla_entries, const int add_info, Args&&... args)
+  // requires
+  //   std::is_base_of_v<PoolAllocatedObjectBase<typename
+  //   memory_pool::size_type>, T>
+  //     && std::is_base_of<ObjectWithVLAEmulation<T, VLAValueType>, T>::value
+  //     && std::is_constructible_v<T, allocation_size_type, Args&&...>
   {
-
-
     static_assert(
-      std::is_base_of<ObjectWithVLAEmulation<T, VLAValueType>, T>::value,
-      "Can't append emulated variable length array of type with greater alignment than"
-      "  the type to which the VLA is being appended"
-    );
+        std::is_base_of<ObjectWithVLAEmulation<T, VLAValueType>, T>::value,
+        "Can't append emulated variable length array of type with greater "
+        "alignment than"
+        "  the type to which the VLA is being appended");
 
     using vla_emulation_base = ObjectWithVLAEmulation<T, VLAValueType>;
 
-    auto const allocation_size = vla_emulation_base::required_allocation_size(n_vla_entries);
+    auto const allocation_size =
+        vla_emulation_base::required_allocation_size(n_vla_entries);
     auto result = _do_pool_allocate(allocation_size, add_info);
-    
-    //printf("allocating vla object: %d, %08x \n", add_info, result.pointer);
-    //fflush(stdout);
+
+    // printf("allocating vla object: %d, %08x \n", add_info, result.pointer);
+    // fflush(stdout);
 
     KOKKOS_ASSERT(result.success && "Memory allocation failure");
 
-    auto rv = _do_contruct<T>(result.pointer, allocation_size, std::forward<Args>(args)...);
-    
-    //printf("vla object constructed: %d, %08x \n", add_info, result.pointer);
-    //fflush(stdout);
+    auto rv = _do_contruct<T>(result.pointer, allocation_size,
+                              std::forward<Args>(args)...);
+
+    // printf("vla object constructed: %d, %08x \n", add_info, result.pointer);
+    // fflush(stdout);
 
     // KOKKOS_ENSURES(intptr_t(rv) % alignof(T) == 0);
 
@@ -248,11 +230,10 @@ public:
   }
 
   template <class CountType>
-  KOKKOS_INLINE_FUNCTION
-  void deallocate(PoolAllocatedObjectBase<CountType>&& obj)
-  {
+  KOKKOS_INLINE_FUNCTION void deallocate(
+      PoolAllocatedObjectBase<CountType>&& obj) {
     m_pool.deallocate((void*)&obj, 1);
-    Kokkos::atomic_decrement(&m_count_alloc); // memory_order_relaxed
+    Kokkos::atomic_decrement(&m_count_alloc);  // memory_order_relaxed
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -271,10 +252,8 @@ public:
 // END OLD CODE
 ////////////////////////////////////////////////////////////////////////////////
 
-
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
 
 #endif /* #if defined( KOKKOS_ENABLE_TASKDAG ) */
 #endif /* #ifndef KOKKOS_IMPL_TASKQUEUEMEMORYMANAGER_HPP */
-

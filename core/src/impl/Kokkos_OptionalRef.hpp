@@ -58,27 +58,25 @@
 namespace Kokkos {
 namespace Impl {
 
-struct InPlaceTag { };
+struct InPlaceTag {};
 
 template <class T>
 struct OptionalRef {
-private:
-
+ private:
   ObservingRawPtr<T> m_value = nullptr;
 
-public:
-
+ public:
   using value_type = T;
 
   KOKKOS_INLINE_FUNCTION
   OptionalRef() = default;
 
   KOKKOS_INLINE_FUNCTION
-  OptionalRef(OptionalRef const& other) { 
-	  //printf("Copy Construct optional ref: %08x\n", other.m_value);
-      m_value = other.m_value;
+  OptionalRef(OptionalRef const& other) {
+    // printf("Copy Construct optional ref: %08x\n", other.m_value);
+    m_value = other.m_value;
   }
-  
+
   KOKKOS_INLINE_FUNCTION
   OptionalRef(OptionalRef&&) = default;
 
@@ -86,12 +84,10 @@ public:
   OptionalRef& operator=(OptionalRef const&) = default;
 
   KOKKOS_INLINE_FUNCTION
-  // Can't return a reference to volatile OptionalRef, since GCC issues a warning about
-  // reference to volatile not accessing the underlying value
-  void
-  operator=(OptionalRef const volatile& other) volatile noexcept
-  {
-	//printf("Copy Construct volatile optional ref: %08x\n", other.m_value);
+  // Can't return a reference to volatile OptionalRef, since GCC issues a
+  // warning about reference to volatile not accessing the underlying value
+  void operator=(OptionalRef const volatile& other) volatile noexcept {
+    // printf("Copy Construct volatile optional ref: %08x\n", other.m_value);
     m_value = other.m_value;
   }
 
@@ -102,45 +98,46 @@ public:
   ~OptionalRef() = default;
 
   KOKKOS_INLINE_FUNCTION
-  explicit OptionalRef(T& arg_value) : m_value(&arg_value) { 
-	  //printf("Construct optional ref from ptr: %08x\n", &arg_value);
+  explicit OptionalRef(T& arg_value) : m_value(&arg_value) {
+    // printf("Construct optional ref from ptr: %08x\n", &arg_value);
   }
 
   KOKKOS_INLINE_FUNCTION
   explicit OptionalRef(std::nullptr_t) : m_value(nullptr) {
-	  //printf("Construct optional ref from nullptr\n");
-   }
-
-  KOKKOS_INLINE_FUNCTION
-  OptionalRef& operator=(T& arg_value) { 
-	 // printf("Assignment operator for optional ref from ptr: %08x\n", &arg_value);
-	  m_value = &arg_value; 
-	  return *this; 
+    // printf("Construct optional ref from nullptr\n");
   }
 
   KOKKOS_INLINE_FUNCTION
-  OptionalRef& operator=(std::nullptr_t) { 
-	 // printf("Assignment operator from null\n");
-	  m_value = nullptr; 
-	  return *this; 
+  OptionalRef& operator=(T& arg_value) {
+    // printf("Assignment operator for optional ref from ptr: %08x\n",
+    // &arg_value);
+    m_value = &arg_value;
+    return *this;
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  OptionalRef& operator=(std::nullptr_t) {
+    // printf("Assignment operator from null\n");
+    m_value = nullptr;
+    return *this;
   }
 
   //----------------------------------------
-  
+
   KOKKOS_INLINE_FUNCTION
   T& operator*() & {
     KOKKOS_EXPECTS(this->has_value());
     return *m_value;
   }
-   
+
   KOKKOS_INLINE_FUNCTION
-  T const& operator*() const & {
+  T const& operator*() const& {
     KOKKOS_EXPECTS(this->has_value());
     return *m_value;
   }
 
   KOKKOS_INLINE_FUNCTION
-  T volatile& operator*() volatile & {
+  T volatile& operator*() volatile& {
     KOKKOS_EXPECTS(this->has_value());
     return *m_value;
   }
@@ -170,19 +167,13 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
-  T* get() {
-    return m_value;
-  }
+  T* get() { return m_value; }
 
   KOKKOS_INLINE_FUNCTION
-  T const* get() const {
-    return m_value;
-  }
+  T const* get() const { return m_value; }
 
   KOKKOS_INLINE_FUNCTION
-  T volatile* get() volatile {
-    return m_value;
-  }
+  T volatile* get() volatile { return m_value; }
 
   //----------------------------------------
 
@@ -203,16 +194,12 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   bool has_value() volatile { return m_value != nullptr; }
-  
 };
 
-} // end namespace Impl
-} // end namespace Kokkos
+}  // end namespace Impl
+}  // end namespace Kokkos
 
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
-
-
 
 #endif /* #ifndef KOKKOS_IMPL_OPTIONALREF_HPP */
-

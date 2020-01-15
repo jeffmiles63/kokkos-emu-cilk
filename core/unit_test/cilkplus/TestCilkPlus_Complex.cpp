@@ -42,6 +42,5 @@
 //@HEADER
 */
 
-#include<cilkplus/TestCilkPlus_Category.hpp>
-#include<TestComplex.hpp>
-
+#include <cilkplus/TestCilkPlus_Category.hpp>
+#include <TestComplex.hpp>

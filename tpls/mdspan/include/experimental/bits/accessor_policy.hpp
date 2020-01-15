@@ -49,41 +49,41 @@ namespace experimental {
 inline namespace fundamentals_v3 {
 
 // [mdspan.accessor.basic]
-template<class ElementType>
+template <class ElementType>
 class accessor_basic;
 
-
-template<class ElementType>
+template <class ElementType>
 class accessor_basic {
-public:
+ public:
   using element_type  = ElementType;
   using pointer       = ElementType*;
   using offset_policy = accessor_basic;
   using reference     = ElementType&;
-  
-  constexpr accessor_basic() noexcept = default ;
 
-  constexpr accessor_basic( accessor_basic && ) noexcept = default ;
+  constexpr accessor_basic() noexcept = default;
 
-  constexpr accessor_basic( const accessor_basic & ) noexcept = default ;
+  constexpr accessor_basic(accessor_basic&&) noexcept = default;
 
-  accessor_basic & operator = ( accessor_basic && ) noexcept = default ;
+  constexpr accessor_basic(const accessor_basic&) noexcept = default;
 
-  accessor_basic & operator = ( const accessor_basic & ) noexcept = default ;  
+  accessor_basic& operator=(accessor_basic&&) noexcept = default;
 
-  constexpr typename offset_policy::pointer
-    offset( pointer p , ptrdiff_t i ) const noexcept
-      { return typename offset_policy::pointer(p+i); }
+  accessor_basic& operator=(const accessor_basic&) noexcept = default;
 
-  constexpr reference access( pointer p , ptrdiff_t i ) const noexcept
-    { 
-		//printf("basic accessor: %d, %08x \n", i, p);
-		//fflush(stdout);
-		return p[i]; 
-	}
+  constexpr typename offset_policy::pointer offset(pointer p, ptrdiff_t i) const
+      noexcept {
+    return typename offset_policy::pointer(p + i);
+  }
 
-  constexpr ElementType* decay( pointer p ) const noexcept
-    { return p; }
+  constexpr reference access(pointer p, ptrdiff_t i) const noexcept {
+    // printf("basic accessor: %d, %08x \n", i, p);
+    // fflush(stdout);
+    return p[i];
+  }
+
+  constexpr ElementType* decay(pointer p) const noexcept { return p; }
 };
 
-}}} // std::experimental::fundamentals_v3
+}  // namespace fundamentals_v3
+}  // namespace experimental
+}  // namespace std

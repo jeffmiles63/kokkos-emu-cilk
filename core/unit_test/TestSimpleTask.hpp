@@ -49,16 +49,14 @@
 #include <cassert>
 #include <sys/time.h>
 
-static int task_cnt = 0;
+static int task_cnt  = 0;
 static int spawn_cnt = 0;
 
 //==============================================================================
 
 // Use this to estimate the size of the memory pool for a fibonacci problem with
 // argument `n`
-size_t
-estimate_required_memory(int n)
-{
+size_t estimate_required_memory(int n) {
   assert(n >= 0);
   auto nl = static_cast<size_t>(n);
   return (nl + 1) * (nl + 1) * 2000;
@@ -67,133 +65,114 @@ estimate_required_memory(int n)
 //==============================================================================
 
 // We want to implement a task-parallel version of this serial algorithm:
-int fib_serial(int n)
-{
-  if(n < 2) return n;
+int fib_serial(int n) {
+  if (n < 2)
+    return n;
   else {
-    return fib_serial(n-1) + fib_serial(n-2);
+    return fib_serial(n - 1) + fib_serial(n - 2);
   }
 }
 
 //==============================================================================
 
 template <class Scheduler>
-struct FibonacciTask
-{
-  using value_type = int;
+struct FibonacciTask {
+  using value_type  = int;
   using future_type = Kokkos::BasicFuture<int, Scheduler>;
 
   int n;
   future_type fn_1;
   future_type fn_2;
-  
 
   KOKKOS_INLINE_FUNCTION
-  explicit
-  FibonacciTask(int num) noexcept
-    : n(num)
-  { 
-	  Kokkos::atomic_fetch_add( &task_cnt, 1 );
-	  // printf("constructing new fib task: %d \n", n); 
+  explicit FibonacciTask(int num) noexcept : n(num) {
+    Kokkos::atomic_fetch_add(&task_cnt, 1);
+    // printf("constructing new fib task: %d \n", n);
   }
 
   template <class TeamMember>
-  KOKKOS_INLINE_FUNCTION
-  void operator()(TeamMember& member, int& result) {
-	Kokkos::atomic_fetch_add( &spawn_cnt, 1 );
-	//printf("Task operator: [%d %d], [%d %d]\n", member.league_rank(), member.team_rank(), n, result);
-	//fflush(stdout);
+  KOKKOS_INLINE_FUNCTION void operator()(TeamMember& member, int& result) {
+    Kokkos::atomic_fetch_add(&spawn_cnt, 1);
+    // printf("Task operator: [%d %d], [%d %d]\n", member.league_rank(),
+    // member.team_rank(), n, result); fflush(stdout);
     auto& scheduler = member.scheduler();
-    if(n < 2) {
-	  //printf("recursive end of fib task: %d \n", n);
-	  //fflush(stdout);
+    if (n < 2) {
+      // printf("recursive end of fib task: %d \n", n);
+      // fflush(stdout);
       // this is the recursive base case
       result = n;
-    }
-    else if(!fn_1.is_null() && !fn_2.is_null()) {
-	  //printf("respawn fib task: %d  %s - %s \n", n,
-	  //    (fn_1.is_ready()) ? "true" : "false",
-	  //    (fn_2.is_ready()) ? "true" : "false");
-	  //fflush(stdout);
+    } else if (!fn_1.is_null() && !fn_2.is_null()) {
+      // printf("respawn fib task: %d  %s - %s \n", n,
+      //    (fn_1.is_ready()) ? "true" : "false",
+      //    (fn_2.is_ready()) ? "true" : "false");
+      // fflush(stdout);
       // We only get here after respawn, so just set the result
       result = fn_1.get() + fn_2.get();
-    }
-    else {
-	  //printf("recursive layer fib task: %d \n", n);
-	  //fflush(stdout);
+    } else {
+      // printf("recursive layer fib task: %d \n", n);
+      // fflush(stdout);
       // Spawn child tasks for the subproblems
-      fn_1 = Kokkos::task_spawn(
-        Kokkos::TaskSingle(scheduler),
-        FibonacciTask{n-1}
-      );
-      fn_2 = Kokkos::task_spawn(
-        Kokkos::TaskSingle(scheduler),
-        FibonacciTask{n-2}
-      );
-      
-	  //printf("fib task waiting: %d %d %d \n", n, n-1, n-2);
-	  //fflush(stdout);      
+      fn_1 = Kokkos::task_spawn(Kokkos::TaskSingle(scheduler),
+                                FibonacciTask{n - 1});
+      fn_2 = Kokkos::task_spawn(Kokkos::TaskSingle(scheduler),
+                                FibonacciTask{n - 2});
+
+      // printf("fib task waiting: %d %d %d \n", n, n-1, n-2);
+      // fflush(stdout);
       // Create an aggregate predecessor for our respawn
-      Kokkos::BasicFuture<void, Scheduler> fib_array[] = { fn_1, fn_2 };
+      Kokkos::BasicFuture<void, Scheduler> fib_array[] = {fn_1, fn_2};
       auto f_all = scheduler.when_all(fib_array, 2);
 
-	//  printf("fib task calling respawn: %d %d %d \n", n, n-1, n-2);
-	//  fflush(stdout);             
+      //  printf("fib task calling respawn: %d %d %d \n", n, n-1, n-2);
+      //  fflush(stdout);
       // Respawn this task with `f_all` as a predecessor
       Kokkos::respawn(this, f_all);
     }
   }
-
 };
 
 namespace Test {
 
-  TEST_F( TEST_CATEGORY, simple_task )
+TEST_F(TEST_CATEGORY, simple_task) {
+  int n = 10;  // Fib number to compute
+
+  using scheduler_type =
+      Kokkos::SimpleEmuTaskScheduler<Kokkos::DefaultExecutionSpace>;
+  using memory_space = typename scheduler_type::memory_space;
+  using memory_pool  = typename scheduler_type::memory_pool;
+
+  auto mpool     = memory_pool(memory_space{}, estimate_required_memory(n));
+  auto scheduler = scheduler_type(mpool);
+
+  Kokkos::BasicFuture<int, scheduler_type> result;
+
   {
-    int n = 10; // Fib number to compute
+    // launch the root task from the host
+    result = Kokkos::host_spawn(Kokkos::TaskSingle(scheduler),
+                                FibonacciTask<scheduler_type>{n});
 
-    using scheduler_type = Kokkos::SimpleEmuTaskScheduler<Kokkos::DefaultExecutionSpace>;
-    using memory_space = typename scheduler_type::memory_space;
-    using memory_pool = typename scheduler_type::memory_pool;
+    // wait on all tasks submitted to the scheduler to be done
+    Kokkos::wait(scheduler);
+  }
 
-    auto mpool = memory_pool(memory_space{}, estimate_required_memory(n));
-    auto scheduler = scheduler_type(mpool);
+  printf(" Fib task count = %d, spawn count = %d \n", task_cnt, spawn_cnt);
 
-    Kokkos::BasicFuture<int, scheduler_type> result;
-
-    {
-      // launch the root task from the host
-      result =
-        Kokkos::host_spawn(
-          Kokkos::TaskSingle(scheduler),
-          FibonacciTask<scheduler_type>{n}
-        );
-
-      // wait on all tasks submitted to the scheduler to be done
-      Kokkos::wait(scheduler);
+  // Output results
+  if (!result.is_null() && result.is_ready()) {
+    auto result_serial = fib_serial(n);
+    if (result.get() == result_serial) {
+      printf("  Success! Fibonacci(%d) = %d\n", n, result.get());
+    } else {
+      printf(
+          "  Error! Task result of Fibonacci(%d) was %d, but serial result was "
+          "%d\n",
+          n, result.get(), result_serial);
     }
-    
-    printf(" Fib task count = %d, spawn count = %d \n", task_cnt, spawn_cnt);
-
-    // Output results
-    if(!result.is_null() && result.is_ready()) {
-      auto result_serial = fib_serial(n);
-      if(result.get() == result_serial) {
-        printf("  Success! Fibonacci(%d) = %d\n", n, result.get());
-      }
-      else {
-        printf(
-          "  Error! Task result of Fibonacci(%d) was %d, but serial result was %d\n",
-          n, result.get(), result_serial
-        );
-      }
-    }
-    else { 
-		if (result.is_null())
-		    printf("  Error! Result of Fibonacci(%d) is not null\n", n);
-		else
-            printf("  Error! Result of Fibonacci(%d) is not ready\n", n);
-    }
-
+  } else {
+    if (result.is_null())
+      printf("  Error! Result of Fibonacci(%d) is not null\n", n);
+    else
+      printf("  Error! Result of Fibonacci(%d) is not ready\n", n);
   }
 }
+}  // namespace Test

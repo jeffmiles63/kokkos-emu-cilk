@@ -49,15 +49,15 @@
 
 #include <Kokkos_Core_fwd.hpp>
 
-#if defined( KOKKOS_ENABLE_SERIAL )
+#if defined(KOKKOS_ENABLE_SERIAL)
 #include <Kokkos_Serial.hpp>
 #endif
 
-#if defined( KOKKOS_ENABLE_CILKPLUS )
+#if defined(KOKKOS_ENABLE_CILKPLUS)
 #include <Kokkos_CilkPlus.hpp>
 #endif
 
-#if defined( KOKKOS_ENABLE_OPENMP )
+#if defined(KOKKOS_ENABLE_OPENMP)
 #include <Kokkos_OpenMP.hpp>
 #endif
 
@@ -66,19 +66,19 @@
 #include <Kokkos_OpenMPTargetSpace.hpp>
 //#endif
 
-#if defined( KOKKOS_ENABLE_QTHREADS )
+#if defined(KOKKOS_ENABLE_QTHREADS)
 #include <Kokkos_Qthreads.hpp>
 #endif
 
-#if defined( KOKKOS_ENABLE_THREADS )
+#if defined(KOKKOS_ENABLE_THREADS)
 #include <Kokkos_Threads.hpp>
 #endif
 
-#if defined( KOKKOS_ENABLE_CUDA )
+#if defined(KOKKOS_ENABLE_CUDA)
 #include <Kokkos_Cuda.hpp>
 #endif
 
-#if defined( KOKKOS_ENABLE_ROCM )
+#if defined(KOKKOS_ENABLE_ROCM)
 #include <Kokkos_ROCm.hpp>
 #endif
 
@@ -110,18 +110,13 @@ struct InitArguments {
   int skip_device;
   bool disable_warnings;
 
-  InitArguments( int nt = -1
-               , int nn = -1
-               , int dv = -1
-               , bool dw = false
-               )
-    : num_threads{ nt }
-    , num_numa{ nn }
-    , device_id{ dv }
-    , ndevices{ -1 }
-    , skip_device{ 9999 }
-    , disable_warnings{ dw }
-  {}
+  InitArguments(int nt = -1, int nn = -1, int dv = -1, bool dw = false)
+      : num_threads{nt},
+        num_numa{nn},
+        device_id{dv},
+        ndevices{-1},
+        skip_device{9999},
+        disable_warnings{dw} {}
 };
 
 void initialize(int& narg, char* arg[]);
@@ -163,9 +158,9 @@ void finalize_all();
 void fence();
 
 /** \brief Print "Bill of Materials" */
-void print_configuration( std::ostream & , const bool detail = false );
+void print_configuration(std::ostream&, const bool detail = false);
 
-} // namespace Kokkos
+}  // namespace Kokkos
 
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
@@ -176,92 +171,80 @@ namespace Kokkos {
  * The allocation is tracked in Kokkos memory tracking system, so
  * leaked memory can be identified.
  */
-template< class Space = typename Kokkos::DefaultExecutionSpace::memory_space >
-inline
-void * kokkos_malloc( const std::string & arg_alloc_label
-                    , const size_t arg_alloc_size )
-{
-  typedef typename Space::memory_space MemorySpace ;
-  return Impl::SharedAllocationRecord< MemorySpace >::
-    allocate_tracked( MemorySpace() , arg_alloc_label , arg_alloc_size );
+template <class Space = typename Kokkos::DefaultExecutionSpace::memory_space>
+inline void* kokkos_malloc(const std::string& arg_alloc_label,
+                           const size_t arg_alloc_size) {
+  typedef typename Space::memory_space MemorySpace;
+  return Impl::SharedAllocationRecord<MemorySpace>::allocate_tracked(
+      MemorySpace(), arg_alloc_label, arg_alloc_size);
 }
 
-template< class Space = typename Kokkos::DefaultExecutionSpace::memory_space >
-inline
-void * kokkos_malloc( const size_t arg_alloc_size )
-{
-  typedef typename Space::memory_space MemorySpace ;
-  return Impl::SharedAllocationRecord< MemorySpace >::
-    allocate_tracked( MemorySpace() , "no-label" , arg_alloc_size );
+template <class Space = typename Kokkos::DefaultExecutionSpace::memory_space>
+inline void* kokkos_malloc(const size_t arg_alloc_size) {
+  typedef typename Space::memory_space MemorySpace;
+  return Impl::SharedAllocationRecord<MemorySpace>::allocate_tracked(
+      MemorySpace(), "no-label", arg_alloc_size);
 }
 
-template< class Space = typename Kokkos::DefaultExecutionSpace::memory_space >
-inline
-void kokkos_free( void * arg_alloc )
-{
-  typedef typename Space::memory_space MemorySpace ;
-  return Impl::SharedAllocationRecord< MemorySpace >::
-    deallocate_tracked( arg_alloc );
+template <class Space = typename Kokkos::DefaultExecutionSpace::memory_space>
+inline void kokkos_free(void* arg_alloc) {
+  typedef typename Space::memory_space MemorySpace;
+  return Impl::SharedAllocationRecord<MemorySpace>::deallocate_tracked(
+      arg_alloc);
 }
 
-template< class Space = typename Kokkos::DefaultExecutionSpace::memory_space >
-inline
-void * kokkos_realloc( void * arg_alloc , const size_t arg_alloc_size )
-{
-  typedef typename Space::memory_space MemorySpace ;
-  return Impl::SharedAllocationRecord< MemorySpace >::
-    reallocate_tracked( arg_alloc , arg_alloc_size );
+template <class Space = typename Kokkos::DefaultExecutionSpace::memory_space>
+inline void* kokkos_realloc(void* arg_alloc, const size_t arg_alloc_size) {
+  typedef typename Space::memory_space MemorySpace;
+  return Impl::SharedAllocationRecord<MemorySpace>::reallocate_tracked(
+      arg_alloc, arg_alloc_size);
 }
 
-} // namespace Kokkos
+}  // namespace Kokkos
 
 namespace Kokkos {
 
 /** \brief  ScopeGuard
- *  Some user scope issues have been identified with some Kokkos::finalize calls;
- *  ScopeGuard aims to correct these issues.
+ *  Some user scope issues have been identified with some Kokkos::finalize
+ * calls; ScopeGuard aims to correct these issues.
  *
- *  Two requirements for ScopeGuard: 
- *     if Kokkos::is_initialized() in the constructor, don't call Kokkos::initialize or Kokkos::finalize
- *     it is not copyable or assignable
+ *  Two requirements for ScopeGuard:
+ *     if Kokkos::is_initialized() in the constructor, don't call
+ * Kokkos::initialize or Kokkos::finalize it is not copyable or assignable
  */
 
 class ScopeGuard {
-public:
-  ScopeGuard ( int& narg, char* arg[] )
-  {
-    sg_init = false; 
-    if ( ! Kokkos::is_initialized() ) { 
-      initialize( narg, arg );
+ public:
+  ScopeGuard(int& narg, char* arg[]) {
+    sg_init = false;
+    if (!Kokkos::is_initialized()) {
+      initialize(narg, arg);
       sg_init = true;
     }
   }
 
-  ScopeGuard ( const InitArguments& args = InitArguments() )
-  {
-    sg_init = false; 
-    if ( ! Kokkos::is_initialized() ) { 
-      initialize( args );
+  ScopeGuard(const InitArguments& args = InitArguments()) {
+    sg_init = false;
+    if (!Kokkos::is_initialized()) {
+      initialize(args);
       sg_init = true;
     }
   }
 
-  ~ScopeGuard( )
-  {
-    if ( Kokkos::is_initialized() && sg_init) { 
-      finalize(); 
+  ~ScopeGuard() {
+    if (Kokkos::is_initialized() && sg_init) {
+      finalize();
     }
   }
 
-//private:
-  bool sg_init;    
+  // private:
+  bool sg_init;
 
-  ScopeGuard& operator=( const ScopeGuard& ) = delete;
-  ScopeGuard( const ScopeGuard& ) = delete;
-
+  ScopeGuard& operator=(const ScopeGuard&) = delete;
+  ScopeGuard(const ScopeGuard&)            = delete;
 };
 
-} // namespace Kokkos
+}  // namespace Kokkos
 
 #include <Kokkos_Crs.hpp>
 #include <Kokkos_WorkGraphPolicy.hpp>
@@ -270,4 +253,3 @@ public:
 //----------------------------------------------------------------------------
 
 #endif
-

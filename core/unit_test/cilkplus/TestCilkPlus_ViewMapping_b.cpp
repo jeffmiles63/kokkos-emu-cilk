@@ -43,4 +43,3 @@
 
 #include <cilkplus/TestCilkPlus_Category.hpp>
 #include <TestViewMapping_b.hpp>
-

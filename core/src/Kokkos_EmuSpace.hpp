@@ -45,7 +45,7 @@
 #define KOKKOS_EmuLocalSpace_HPP
 
 #include <Kokkos_Macros.hpp>
-#if defined( KOKKOS_ENABLE_EMU )
+#if defined(KOKKOS_ENABLE_EMU)
 
 #include <Kokkos_Core_fwd.hpp>
 #include <cilk/cilk.h>
@@ -60,42 +60,39 @@
 namespace Kokkos {
 namespace Experimental {
 
-
 #ifdef COMPILE_EMU_SPACE
-   #define EMU_EXPORTS
+#define EMU_EXPORTS
 #else
-   #define EMU_EXPORTS extern
+#define EMU_EXPORTS extern
 #endif
 
-EMU_EXPORTS void print_pointer( int i, void* ptr, const char * name ); 
+EMU_EXPORTS void print_pointer(int i, void* ptr, const char* name);
 
 /** \brief  Emu on-device memory management */
 
 class EmuLocalSpace {
-public:
-
+ public:
   //! Tag this class as a kokkos memory space
-  typedef EmuLocalSpace                           memory_space ;
-  typedef Kokkos::Experimental::CilkPlus          execution_space ;
-  typedef Kokkos::Device<execution_space,memory_space> device_type;
+  typedef EmuLocalSpace memory_space;
+  typedef Kokkos::Experimental::CilkPlus execution_space;
+  typedef Kokkos::Device<execution_space, memory_space> device_type;
 
-  typedef unsigned int          size_type ;
+  typedef unsigned int size_type;
 
   /*--------------------------------*/
 
   EmuLocalSpace();
-  EmuLocalSpace( EmuLocalSpace && rhs ) = default ;
-  EmuLocalSpace( const EmuLocalSpace & rhs ) = default ;
-  EmuLocalSpace & operator = ( EmuLocalSpace && rhs ) = default ;
-  EmuLocalSpace & operator = ( const EmuLocalSpace & rhs ) = default ;
-  ~EmuLocalSpace() = default ;
+  EmuLocalSpace(EmuLocalSpace&& rhs)      = default;
+  EmuLocalSpace(const EmuLocalSpace& rhs) = default;
+  EmuLocalSpace& operator=(EmuLocalSpace&& rhs) = default;
+  EmuLocalSpace& operator=(const EmuLocalSpace& rhs) = default;
+  ~EmuLocalSpace()                                   = default;
 
   /**\brief  Allocate untracked memory in the emu local space */
-  void * allocate( const size_t arg_alloc_size ) const ;
+  void* allocate(const size_t arg_alloc_size) const;
 
   /**\brief  Deallocate untracked memory in the emu local space */
-  void deallocate( void * const arg_alloc_ptr
-                 , const size_t arg_alloc_size ) const ;
+  void deallocate(void* const arg_alloc_ptr, const size_t arg_alloc_size) const;
 
   /**\brief Return Name of the MemorySpace */
   static constexpr const char* name() { return m_name; }
@@ -103,17 +100,18 @@ public:
   /*--------------------------------*/
   /** \brief  Error reporting for attempt to access data not on current NODE */
   static void access_error();
-  static void access_error( const void * const );
-  static void * local_root_record;
+  static void access_error(const void* const);
+  static void* local_root_record;
   static int memory_zones();
 
-private:
+ private:
   static constexpr const char* m_name = "EmuLocalSpace";
-  friend class Kokkos::Impl::SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , void > ;
+  friend class Kokkos::Impl::SharedAllocationRecord<
+      Kokkos::Experimental::EmuLocalSpace, void>;
 };
 
-} // Experimental
-} // namespace Kokkos
+}  // namespace Experimental
+}  // namespace Kokkos
 
 /*--------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------*/
@@ -122,63 +120,58 @@ namespace Kokkos {
 namespace Experimental {
 
 /** \brief  Replicated Emu memory that is accessible to Host execution space
-              -- Generally this will be used with const views -- so that the 
+              -- Generally this will be used with const views -- so that the
                  data is consistent on each node.
  */
 class EmuReplicatedSpace {
-public:
-
+ public:
   //! Tag this class as a kokkos memory space
-  typedef EmuReplicatedSpace    memory_space ;
-  typedef CilkPlus              execution_space ;
-  typedef Kokkos::Device<execution_space,memory_space> device_type;
-  typedef unsigned int          size_type ;
+  typedef EmuReplicatedSpace memory_space;
+  typedef CilkPlus execution_space;
+  typedef Kokkos::Device<execution_space, memory_space> device_type;
+  typedef unsigned int size_type;
 
   /*--------------------------------*/
-
 
   /*--------------------------------*/
 
   EmuReplicatedSpace();
-  EmuReplicatedSpace( EmuReplicatedSpace && rhs ) = default ;
-  EmuReplicatedSpace( const EmuReplicatedSpace & rhs ) = default ;
-  EmuReplicatedSpace & operator = ( EmuReplicatedSpace && rhs ) = default ;
-  EmuReplicatedSpace & operator = ( const EmuReplicatedSpace & rhs ) = default ;
-  ~EmuReplicatedSpace() = default ;
+  EmuReplicatedSpace(EmuReplicatedSpace&& rhs)      = default;
+  EmuReplicatedSpace(const EmuReplicatedSpace& rhs) = default;
+  EmuReplicatedSpace& operator=(EmuReplicatedSpace&& rhs) = default;
+  EmuReplicatedSpace& operator=(const EmuReplicatedSpace& rhs) = default;
+  ~EmuReplicatedSpace()                                        = default;
 
   /**\brief  Allocate untracked memory in the emu replicated space */
-  void * allocate( const size_t arg_alloc_size ) const ;
+  void* allocate(const size_t arg_alloc_size) const;
 
   /**\brief  Deallocate untracked memory in the emu replicated space */
-  void deallocate( void * const arg_alloc_ptr
-                 , const size_t arg_alloc_size ) const ;
+  void deallocate(void* const arg_alloc_ptr, const size_t arg_alloc_size) const;
 
   /**\brief Return Name of the MemorySpace */
   static constexpr const char* name() { return m_name; }
 
-  static void custom_increment( void * pRec );
+  static void custom_increment(void* pRec);
 
-  static void * custom_decrement( void * pRec );
+  static void* custom_decrement(void* pRec);
 
-  static long * getRefAddr();
+  static long* getRefAddr();
   static int memory_zones();
 
-  static void * ers;
-  static void * repl_root_record;
-  static long * node_count;
-  static long * ref_addr;
+  static void* ers;
+  static void* repl_root_record;
+  static long* node_count;
+  static long* ref_addr;
 
   /*--------------------------------*/
 
-private:
+ private:
   static constexpr const char* m_name = "EmuReplicated";
-
 };
 
-} // Experimental
-} // namespace Kokkos
+}  // namespace Experimental
+}  // namespace Kokkos
 
-  
 /*--------------------------------------------------------------------------*/
 /*------------------------------------------------------allocate--------------------*/
 
@@ -189,52 +182,49 @@ namespace Experimental {
  *          through emu stride allocation .   (1d, 2d, strided)
  */
 class EmuStridedSpace {
-public:
-
+ public:
   //! Tag this class as a kokkos memory space
   /** \brief  Memory is in HostSpace so use the HostSpace::execution_space */
-  typedef HostSpace::execution_space  execution_space ;
-  typedef EmuStridedSpace         memory_space ;
-  typedef Kokkos::Device<execution_space,memory_space> device_type;
-  typedef unsigned int                size_type ;
+  typedef HostSpace::execution_space execution_space;
+  typedef EmuStridedSpace memory_space;
+  typedef Kokkos::Device<execution_space, memory_space> device_type;
+  typedef unsigned int size_type;
 
   /*--------------------------------*/
 
   EmuStridedSpace();
-  EmuStridedSpace( EmuStridedSpace && rhs ) = default ;
-  EmuStridedSpace( const EmuStridedSpace & rhs ) = default ;
-  EmuStridedSpace & operator = ( EmuStridedSpace && rhs ) = default ;
-  EmuStridedSpace & operator = ( const EmuStridedSpace & rhs ) = default ;
-  ~EmuStridedSpace() = default ;
+  EmuStridedSpace(EmuStridedSpace&& rhs)      = default;
+  EmuStridedSpace(const EmuStridedSpace& rhs) = default;
+  EmuStridedSpace& operator=(EmuStridedSpace&& rhs) = default;
+  EmuStridedSpace& operator=(const EmuStridedSpace& rhs) = default;
+  ~EmuStridedSpace()                                     = default;
 
   /**\brief  Allocate untracked memory in the space */
-  void * allocate( const size_t arg_alloc_size ) const ;
+  void* allocate(const size_t arg_alloc_size) const;
 
   /**\brief  Deallocate untracked memory in the space */
-  void deallocate( void * const arg_alloc_ptr
-                 , const size_t arg_alloc_size ) const ;
+  void deallocate(void* const arg_alloc_ptr, const size_t arg_alloc_size) const;
 
   /**\brief Return Name of the MemorySpace */
   static constexpr const char* name() { return m_name; }
 
-  static void custom_increment( void * pRec );
+  static void custom_increment(void* pRec);
 
-  static void * custom_decrement( void * pRec );
-  
+  static void* custom_decrement(void* pRec);
+
   static int memory_zones();
 
-  static void * ess;
-  static void * strided_root_record;
+  static void* ess;
+  static void* strided_root_record;
 
-private:
-
+ private:
   static constexpr const char* m_name = "EmuStridedSpace";
 
   /*--------------------------------*/
 };
 
-} // Experimental
-} // namespace Kokkos
+}  // namespace Experimental
+}  // namespace Kokkos
 
 /*--------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------*/
@@ -242,119 +232,141 @@ private:
 namespace Kokkos {
 namespace Impl {
 
-static_assert( MemorySpaceAccess< Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::EmuLocalSpace >::assignable , "" );
-static_assert( MemorySpaceAccess< Kokkos::Experimental::EmuReplicatedSpace , Kokkos::Experimental::EmuReplicatedSpace >::assignable , "" );
-static_assert( MemorySpaceAccess< Kokkos::Experimental::EmuStridedSpace , Kokkos::Experimental::EmuStridedSpace >::assignable , "" );
+static_assert(
+    MemorySpaceAccess<Kokkos::Experimental::EmuLocalSpace,
+                      Kokkos::Experimental::EmuLocalSpace>::assignable,
+    "");
+static_assert(
+    MemorySpaceAccess<Kokkos::Experimental::EmuReplicatedSpace,
+                      Kokkos::Experimental::EmuReplicatedSpace>::assignable,
+    "");
+static_assert(
+    MemorySpaceAccess<Kokkos::Experimental::EmuStridedSpace,
+                      Kokkos::Experimental::EmuStridedSpace>::assignable,
+    "");
 
 //----------------------------------------
 
-template<>
-struct MemorySpaceAccess< Kokkos::HostSpace , Kokkos::Experimental::EmuLocalSpace > {
+template <>
+struct MemorySpaceAccess<Kokkos::HostSpace,
+                         Kokkos::Experimental::EmuLocalSpace> {
   enum { assignable = false };
   enum { accessible = true };
-  enum { deepcopy   = true };
+  enum { deepcopy = true };
 };
 
-template<>
-struct MemorySpaceAccess< Kokkos::HostSpace , Kokkos::Experimental::EmuReplicatedSpace > {
+template <>
+struct MemorySpaceAccess<Kokkos::HostSpace,
+                         Kokkos::Experimental::EmuReplicatedSpace> {
   // HostSpace::execution_space != EmuReplicatedSpace::execution_space
   enum { assignable = false };
   enum { accessible = true };
-  enum { deepcopy   = true };
+  enum { deepcopy = true };
 };
 
-template<>
-struct MemorySpaceAccess< Kokkos::HostSpace , Kokkos::Experimental::EmuStridedSpace > {
+template <>
+struct MemorySpaceAccess<Kokkos::HostSpace,
+                         Kokkos::Experimental::EmuStridedSpace> {
   // HostSpace::execution_space == EmuStridedSpace::execution_space
   enum { assignable = true };
   enum { accessible = true };
-  enum { deepcopy   = true };
+  enum { deepcopy = true };
 };
 
 //----------------------------------------
 
-template<>
-struct MemorySpaceAccess< Kokkos::Experimental::EmuLocalSpace , Kokkos::HostSpace > {
+template <>
+struct MemorySpaceAccess<Kokkos::Experimental::EmuLocalSpace,
+                         Kokkos::HostSpace> {
   enum { assignable = false };
   enum { accessible = false };
-  enum { deepcopy   = true };
+  enum { deepcopy = true };
 };
 
-template<>
-struct MemorySpaceAccess< Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::EmuReplicatedSpace > {
+template <>
+struct MemorySpaceAccess<Kokkos::Experimental::EmuLocalSpace,
+                         Kokkos::Experimental::EmuReplicatedSpace> {
   // EmuLocalSpace::execution_space == EmuReplicatedSpace::execution_space
   enum { assignable = true };
   enum { accessible = true };
-  enum { deepcopy   = true };
+  enum { deepcopy = true };
 };
 
-template<>
-struct MemorySpaceAccess< Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::EmuStridedSpace > {
+template <>
+struct MemorySpaceAccess<Kokkos::Experimental::EmuLocalSpace,
+                         Kokkos::Experimental::EmuStridedSpace> {
   // EmuLocalSpace::execution_space != EmuStridedSpace::execution_space
   enum { assignable = false };
-  enum { accessible = true }; // EmuLocalSpace::execution_space
-  enum { deepcopy   = true };
+  enum { accessible = true };  // EmuLocalSpace::execution_space
+  enum { deepcopy = true };
 };
 
 //----------------------------------------
 // EmuReplicatedSpace::execution_space == CilkPlus
 // EmuReplicatedSpace accessible to both Emu and Host
 
-template<>
-struct MemorySpaceAccess< Kokkos::Experimental::EmuReplicatedSpace , Kokkos::HostSpace > {
+template <>
+struct MemorySpaceAccess<Kokkos::Experimental::EmuReplicatedSpace,
+                         Kokkos::HostSpace> {
   enum { assignable = false };
   enum { accessible = true };
-  enum { deepcopy   = true };
+  enum { deepcopy = true };
 };
 
-template<>
-struct MemorySpaceAccess< Kokkos::Experimental::EmuReplicatedSpace , Kokkos::Experimental::EmuLocalSpace > {
+template <>
+struct MemorySpaceAccess<Kokkos::Experimental::EmuReplicatedSpace,
+                         Kokkos::Experimental::EmuLocalSpace> {
   // EmuReplicatedSpace::execution_space == EmuLocalSpace::execution_space
-  // Can access EmuReplicatedSpace from Host but cannot access EmuLocalSpace from Host
+  // Can access EmuReplicatedSpace from Host but cannot access EmuLocalSpace
+  // from Host
   enum { assignable = false };
 
   // EmuReplicatedSpace::execution_space can access EmuLocalSpace
   enum { accessible = true };
-  enum { deepcopy   = true };
+  enum { deepcopy = true };
 };
 
-template<>
-struct MemorySpaceAccess< Kokkos::Experimental::EmuReplicatedSpace , Kokkos::Experimental::EmuStridedSpace > {
+template <>
+struct MemorySpaceAccess<Kokkos::Experimental::EmuReplicatedSpace,
+                         Kokkos::Experimental::EmuStridedSpace> {
   // EmuReplicatedSpace::execution_space != EmuStridedSpace::execution_space
   enum { assignable = false };
-  enum { accessible = true }; // EmuReplicatedSpace::execution_space
-  enum { deepcopy   = true };
+  enum { accessible = true };  // EmuReplicatedSpace::execution_space
+  enum { deepcopy = true };
 };
-
 
 //----------------------------------------
 // EmuStridedSpace::execution_space == HostSpace::execution_space
 // EmuStridedSpace accessible to both Emu and Host
 
-template<>
-struct MemorySpaceAccess< Kokkos::Experimental::EmuStridedSpace , Kokkos::HostSpace > {
-  enum { assignable = true }; 
+template <>
+struct MemorySpaceAccess<Kokkos::Experimental::EmuStridedSpace,
+                         Kokkos::HostSpace> {
+  enum { assignable = true };
   enum { accessible = true };  // EmuStridedSpace::execution_space
-  enum { deepcopy   = true };
+  enum { deepcopy = true };
 };
 
-template<>
-struct MemorySpaceAccess< Kokkos::Experimental::EmuStridedSpace , Kokkos::Experimental::EmuLocalSpace > {
-  enum { assignable = false }; // Cannot access from Host
+template <>
+struct MemorySpaceAccess<Kokkos::Experimental::EmuStridedSpace,
+                         Kokkos::Experimental::EmuLocalSpace> {
+  enum { assignable = false };  // Cannot access from Host
   enum { accessible = false };
-  enum { deepcopy   = true };
+  enum { deepcopy = true };
 };
 
-template<>
-struct MemorySpaceAccess< Kokkos::Experimental::EmuStridedSpace , Kokkos::Experimental::EmuReplicatedSpace > {
-  enum { assignable = false }; // different execution_space
-  enum { accessible = true };  // same accessibility
-  enum { deepcopy   = true };
+template <>
+struct MemorySpaceAccess<Kokkos::Experimental::EmuStridedSpace,
+                         Kokkos::Experimental::EmuReplicatedSpace> {
+  enum { assignable = false };  // different execution_space
+  enum { accessible = true };   // same accessibility
+  enum { deepcopy = true };
 };
 
 //----------------------------------------
 
-}} // namespace Kokkos::Impl
+}  // namespace Impl
+}  // namespace Kokkos
 
 /*--------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------*/
@@ -362,247 +374,269 @@ struct MemorySpaceAccess< Kokkos::Experimental::EmuStridedSpace , Kokkos::Experi
 namespace Kokkos {
 namespace Impl {
 
-void DeepCopyAsyncEmu( void * dst , const void * src , size_t n);
+void DeepCopyAsyncEmu(void* dst, const void* src, size_t n);
 
-template<> struct DeepCopy< Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::CilkPlus>
-{
-  DeepCopy( void * dst , const void * src , size_t );
-  DeepCopy( const Kokkos::Experimental::CilkPlus & , void * dst , const void * src , size_t );
+template <>
+struct DeepCopy<Kokkos::Experimental::EmuLocalSpace,
+                Kokkos::Experimental::EmuLocalSpace,
+                Kokkos::Experimental::CilkPlus> {
+  DeepCopy(void* dst, const void* src, size_t);
+  DeepCopy(const Kokkos::Experimental::CilkPlus&, void* dst, const void* src,
+           size_t);
 };
 
-template<> struct DeepCopy< Kokkos::Experimental::EmuLocalSpace , HostSpace , Kokkos::Experimental::CilkPlus >
-{
-  DeepCopy( void * dst , const void * src , size_t );
-  DeepCopy( const Kokkos::Experimental::CilkPlus & , void * dst , const void * src , size_t );
+template <>
+struct DeepCopy<Kokkos::Experimental::EmuLocalSpace, HostSpace,
+                Kokkos::Experimental::CilkPlus> {
+  DeepCopy(void* dst, const void* src, size_t);
+  DeepCopy(const Kokkos::Experimental::CilkPlus&, void* dst, const void* src,
+           size_t);
 };
 
-template<> struct DeepCopy< HostSpace , Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::CilkPlus >
-{
-  DeepCopy( void * dst , const void * src , size_t );
-  DeepCopy( const Kokkos::Experimental::CilkPlus & , void * dst , const void * src , size_t );
+template <>
+struct DeepCopy<HostSpace, Kokkos::Experimental::EmuLocalSpace,
+                Kokkos::Experimental::CilkPlus> {
+  DeepCopy(void* dst, const void* src, size_t);
+  DeepCopy(const Kokkos::Experimental::CilkPlus&, void* dst, const void* src,
+           size_t);
 };
 
-template<class ExecutionSpace> struct DeepCopy< Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::EmuLocalSpace , ExecutionSpace >
-{
-  inline
-  DeepCopy( void * dst , const void * src , size_t n )
-  { (void) DeepCopy< Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::CilkPlus >( dst , src , n ); }
+template <class ExecutionSpace>
+struct DeepCopy<Kokkos::Experimental::EmuLocalSpace,
+                Kokkos::Experimental::EmuLocalSpace, ExecutionSpace> {
+  inline DeepCopy(void* dst, const void* src, size_t n) {
+    (void)DeepCopy<Kokkos::Experimental::EmuLocalSpace,
+                   Kokkos::Experimental::EmuLocalSpace,
+                   Kokkos::Experimental::CilkPlus>(dst, src, n);
+  }
 
-  inline
-  DeepCopy( const ExecutionSpace& exec, void * dst , const void * src , size_t n )
-  {
+  inline DeepCopy(const ExecutionSpace& exec, void* dst, const void* src,
+                  size_t n) {
     exec.fence();
-    DeepCopyAsyncEmu (dst,src,n);
+    DeepCopyAsyncEmu(dst, src, n);
   }
 };
 
-template<class ExecutionSpace> struct DeepCopy< Kokkos::Experimental::EmuLocalSpace , HostSpace , ExecutionSpace >
-{
-  inline
-  DeepCopy( void * dst , const void * src , size_t n )
-  { (void) DeepCopy< Kokkos::Experimental::EmuLocalSpace , HostSpace , Kokkos::Experimental::CilkPlus>( dst , src , n ); }
+template <class ExecutionSpace>
+struct DeepCopy<Kokkos::Experimental::EmuLocalSpace, HostSpace,
+                ExecutionSpace> {
+  inline DeepCopy(void* dst, const void* src, size_t n) {
+    (void)DeepCopy<Kokkos::Experimental::EmuLocalSpace, HostSpace,
+                   Kokkos::Experimental::CilkPlus>(dst, src, n);
+  }
 
-  inline
-  DeepCopy( const ExecutionSpace& exec, void * dst , const void * src , size_t n )
-  {
+  inline DeepCopy(const ExecutionSpace& exec, void* dst, const void* src,
+                  size_t n) {
     exec.fence();
-    DeepCopyAsyncEmu (dst,src,n);
+    DeepCopyAsyncEmu(dst, src, n);
   }
 };
 
-template<class ExecutionSpace>
-struct DeepCopy< HostSpace , Kokkos::Experimental::EmuLocalSpace , ExecutionSpace >
-{
-  inline
-  DeepCopy( void * dst , const void * src , size_t n )
-  { (void) DeepCopy< HostSpace , Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::CilkPlus >( dst , src , n ); }
+template <class ExecutionSpace>
+struct DeepCopy<HostSpace, Kokkos::Experimental::EmuLocalSpace,
+                ExecutionSpace> {
+  inline DeepCopy(void* dst, const void* src, size_t n) {
+    (void)DeepCopy<HostSpace, Kokkos::Experimental::EmuLocalSpace,
+                   Kokkos::Experimental::CilkPlus>(dst, src, n);
+  }
 
-  inline
-  DeepCopy( const ExecutionSpace& exec, void * dst , const void * src , size_t n )
-  {
+  inline DeepCopy(const ExecutionSpace& exec, void* dst, const void* src,
+                  size_t n) {
     exec.fence();
-    DeepCopyAsyncEmu (dst,src,n);
+    DeepCopyAsyncEmu(dst, src, n);
   }
 };
 
-template<class ExecutionSpace>
-struct DeepCopy< Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::EmuReplicatedSpace , ExecutionSpace >
-{
-  inline
-  DeepCopy( void * dst , const void * src , size_t n )
-  { (void) DeepCopy< Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::EmuReplicatedSpace , Kokkos::Experimental::CilkPlus >( dst , src , n ); }
+template <class ExecutionSpace>
+struct DeepCopy<Kokkos::Experimental::EmuLocalSpace,
+                Kokkos::Experimental::EmuReplicatedSpace, ExecutionSpace> {
+  inline DeepCopy(void* dst, const void* src, size_t n) {
+    (void)DeepCopy<Kokkos::Experimental::EmuLocalSpace,
+                   Kokkos::Experimental::EmuReplicatedSpace,
+                   Kokkos::Experimental::CilkPlus>(dst, src, n);
+  }
 
-  inline
-  DeepCopy( const ExecutionSpace& exec, void * dst , const void * src , size_t n )
-  {
+  inline DeepCopy(const ExecutionSpace& exec, void* dst, const void* src,
+                  size_t n) {
     exec.fence();
-    DeepCopyAsyncEmu (dst,src,n);
+    DeepCopyAsyncEmu(dst, src, n);
   }
 };
 
-template<class ExecutionSpace>
-struct DeepCopy< Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::EmuStridedSpace , ExecutionSpace>
-{
-  inline
-  DeepCopy( void * dst , const void * src , size_t n )
-  { (void) DeepCopy< Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::EmuStridedSpace , Kokkos::Experimental::CilkPlus >( dst , src , n ); }
+template <class ExecutionSpace>
+struct DeepCopy<Kokkos::Experimental::EmuLocalSpace,
+                Kokkos::Experimental::EmuStridedSpace, ExecutionSpace> {
+  inline DeepCopy(void* dst, const void* src, size_t n) {
+    (void)DeepCopy<Kokkos::Experimental::EmuLocalSpace,
+                   Kokkos::Experimental::EmuStridedSpace,
+                   Kokkos::Experimental::CilkPlus>(dst, src, n);
+  }
 
-  inline
-  DeepCopy( const ExecutionSpace& exec, void * dst , const void * src , size_t n )
-  {
+  inline DeepCopy(const ExecutionSpace& exec, void* dst, const void* src,
+                  size_t n) {
     exec.fence();
-    DeepCopyAsyncEmu (dst,src,n);
+    DeepCopyAsyncEmu(dst, src, n);
   }
 };
 
+template <class ExecutionSpace>
+struct DeepCopy<Kokkos::Experimental::EmuReplicatedSpace,
+                Kokkos::Experimental::EmuLocalSpace, ExecutionSpace> {
+  inline DeepCopy(void* dst, const void* src, size_t n) {
+    (void)DeepCopy<Kokkos::Experimental::EmuReplicatedSpace,
+                   Kokkos::Experimental::EmuLocalSpace,
+                   Kokkos::Experimental::CilkPlus>(dst, src, n);
+  }
 
-template<class ExecutionSpace>
-struct DeepCopy< Kokkos::Experimental::EmuReplicatedSpace , Kokkos::Experimental::EmuLocalSpace , ExecutionSpace>
-{
-  inline
-  DeepCopy( void * dst , const void * src , size_t n )
-  { (void) DeepCopy< Kokkos::Experimental::EmuReplicatedSpace , Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::CilkPlus >( dst , src , n ); }
-
-  inline
-  DeepCopy( const ExecutionSpace& exec, void * dst , const void * src , size_t n )
-  {
+  inline DeepCopy(const ExecutionSpace& exec, void* dst, const void* src,
+                  size_t n) {
     exec.fence();
-    DeepCopyAsyncEmu (dst,src,n);
+    DeepCopyAsyncEmu(dst, src, n);
   }
 };
 
-template<class ExecutionSpace>
-struct DeepCopy< Kokkos::Experimental::EmuReplicatedSpace , Kokkos::Experimental::EmuReplicatedSpace , ExecutionSpace>
-{
-  inline
-  DeepCopy( void * dst , const void * src , size_t n )
-  { (void) DeepCopy< Kokkos::Experimental::EmuReplicatedSpace , Kokkos::Experimental::EmuReplicatedSpace , Kokkos::Experimental::CilkPlus >( dst , src , n ); }
+template <class ExecutionSpace>
+struct DeepCopy<Kokkos::Experimental::EmuReplicatedSpace,
+                Kokkos::Experimental::EmuReplicatedSpace, ExecutionSpace> {
+  inline DeepCopy(void* dst, const void* src, size_t n) {
+    (void)DeepCopy<Kokkos::Experimental::EmuReplicatedSpace,
+                   Kokkos::Experimental::EmuReplicatedSpace,
+                   Kokkos::Experimental::CilkPlus>(dst, src, n);
+  }
 
-  inline
-  DeepCopy( const ExecutionSpace& exec, void * dst , const void * src , size_t n )
-  {
+  inline DeepCopy(const ExecutionSpace& exec, void* dst, const void* src,
+                  size_t n) {
     exec.fence();
-    DeepCopyAsyncEmu (dst,src,n);
+    DeepCopyAsyncEmu(dst, src, n);
   }
 };
 
-template<class ExecutionSpace>
-struct DeepCopy< Kokkos::Experimental::EmuReplicatedSpace , Kokkos::Experimental::EmuStridedSpace , ExecutionSpace>
-{
-  inline
-  DeepCopy( void * dst , const void * src , size_t n )
-  { (void) DeepCopy< Kokkos::Experimental::EmuReplicatedSpace , Kokkos::Experimental::EmuStridedSpace , Kokkos::Experimental::CilkPlus >( dst , src , n ); }
+template <class ExecutionSpace>
+struct DeepCopy<Kokkos::Experimental::EmuReplicatedSpace,
+                Kokkos::Experimental::EmuStridedSpace, ExecutionSpace> {
+  inline DeepCopy(void* dst, const void* src, size_t n) {
+    (void)DeepCopy<Kokkos::Experimental::EmuReplicatedSpace,
+                   Kokkos::Experimental::EmuStridedSpace,
+                   Kokkos::Experimental::CilkPlus>(dst, src, n);
+  }
 
-  inline
-  DeepCopy( const ExecutionSpace& exec, void * dst , const void * src , size_t n )
-  {
+  inline DeepCopy(const ExecutionSpace& exec, void* dst, const void* src,
+                  size_t n) {
     exec.fence();
-    DeepCopyAsyncEmu (dst,src,n);
+    DeepCopyAsyncEmu(dst, src, n);
   }
 };
 
-template<class ExecutionSpace> struct DeepCopy< Kokkos::Experimental::EmuReplicatedSpace , HostSpace , ExecutionSpace >
-{
-  inline
-  DeepCopy( void * dst , const void * src , size_t n )
-  { (void) DeepCopy< Kokkos::Experimental::EmuReplicatedSpace , HostSpace , Kokkos::Experimental::CilkPlus >( dst , src , n ); }
+template <class ExecutionSpace>
+struct DeepCopy<Kokkos::Experimental::EmuReplicatedSpace, HostSpace,
+                ExecutionSpace> {
+  inline DeepCopy(void* dst, const void* src, size_t n) {
+    (void)DeepCopy<Kokkos::Experimental::EmuReplicatedSpace, HostSpace,
+                   Kokkos::Experimental::CilkPlus>(dst, src, n);
+  }
 
-  inline
-  DeepCopy( const ExecutionSpace& exec, void * dst , const void * src , size_t n )
-  {
+  inline DeepCopy(const ExecutionSpace& exec, void* dst, const void* src,
+                  size_t n) {
     exec.fence();
-    DeepCopyAsyncEmu (dst,src,n);
+    DeepCopyAsyncEmu(dst, src, n);
   }
 };
 
+template <class ExecutionSpace>
+struct DeepCopy<Kokkos::Experimental::EmuStridedSpace,
+                Kokkos::Experimental::EmuLocalSpace, ExecutionSpace> {
+  inline DeepCopy(void* dst, const void* src, size_t n) {
+    (void)DeepCopy<Kokkos::Experimental::EmuStridedSpace,
+                   Kokkos::Experimental::EmuLocalSpace,
+                   Kokkos::Experimental::CilkPlus>(dst, src, n);
+  }
 
-template<class ExecutionSpace> struct DeepCopy< Kokkos::Experimental::EmuStridedSpace , Kokkos::Experimental::EmuLocalSpace , ExecutionSpace >
-{
-  inline
-  DeepCopy( void * dst , const void * src , size_t n )
-  { (void) DeepCopy< Kokkos::Experimental::EmuStridedSpace , Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::CilkPlus >( dst , src , n ); }
-
-  inline
-  DeepCopy( const ExecutionSpace& exec, void * dst , const void * src , size_t n )
-  {
+  inline DeepCopy(const ExecutionSpace& exec, void* dst, const void* src,
+                  size_t n) {
     exec.fence();
-    DeepCopyAsyncEmu (dst,src,n);
+    DeepCopyAsyncEmu(dst, src, n);
   }
 };
 
-template<class ExecutionSpace> struct DeepCopy< Kokkos::Experimental::EmuStridedSpace , Kokkos::Experimental::EmuReplicatedSpace , ExecutionSpace >
-{
-  inline
-  DeepCopy( void * dst , const void * src , size_t n )
-  { (void) DeepCopy< Kokkos::Experimental::EmuStridedSpace , Kokkos::Experimental::EmuReplicatedSpace , Kokkos::Experimental::CilkPlus >( dst , src , n ); }
+template <class ExecutionSpace>
+struct DeepCopy<Kokkos::Experimental::EmuStridedSpace,
+                Kokkos::Experimental::EmuReplicatedSpace, ExecutionSpace> {
+  inline DeepCopy(void* dst, const void* src, size_t n) {
+    (void)DeepCopy<Kokkos::Experimental::EmuStridedSpace,
+                   Kokkos::Experimental::EmuReplicatedSpace,
+                   Kokkos::Experimental::CilkPlus>(dst, src, n);
+  }
 
-  inline
-  DeepCopy( const ExecutionSpace& exec, void * dst , const void * src , size_t n )
-  {
+  inline DeepCopy(const ExecutionSpace& exec, void* dst, const void* src,
+                  size_t n) {
     exec.fence();
-    DeepCopyAsyncEmu (dst,src,n);
+    DeepCopyAsyncEmu(dst, src, n);
   }
 };
 
-template<class ExecutionSpace> struct DeepCopy< Kokkos::Experimental::EmuStridedSpace , Kokkos::Experimental::EmuStridedSpace , ExecutionSpace >
-{
-  inline
-  DeepCopy( void * dst , const void * src , size_t n )
-  { (void) DeepCopy< Kokkos::Experimental::EmuStridedSpace , Kokkos::Experimental::EmuStridedSpace , Kokkos::Experimental::CilkPlus >( dst , src , n ); }
+template <class ExecutionSpace>
+struct DeepCopy<Kokkos::Experimental::EmuStridedSpace,
+                Kokkos::Experimental::EmuStridedSpace, ExecutionSpace> {
+  inline DeepCopy(void* dst, const void* src, size_t n) {
+    (void)DeepCopy<Kokkos::Experimental::EmuStridedSpace,
+                   Kokkos::Experimental::EmuStridedSpace,
+                   Kokkos::Experimental::CilkPlus>(dst, src, n);
+  }
 
-  inline
-  DeepCopy( const ExecutionSpace& exec, void * dst , const void * src , size_t n )
-  {
+  inline DeepCopy(const ExecutionSpace& exec, void* dst, const void* src,
+                  size_t n) {
     exec.fence();
-    DeepCopyAsyncEmu (dst,src,n);
+    DeepCopyAsyncEmu(dst, src, n);
   }
 };
 
-template<class ExecutionSpace> struct DeepCopy< Kokkos::Experimental::EmuStridedSpace , HostSpace , ExecutionSpace >
-{
-  inline
-  DeepCopy( void * dst , const void * src , size_t n )
-  { (void) DeepCopy< HostSpace , HostSpace , Kokkos::Experimental::CilkPlus >( dst , src , n ); }
+template <class ExecutionSpace>
+struct DeepCopy<Kokkos::Experimental::EmuStridedSpace, HostSpace,
+                ExecutionSpace> {
+  inline DeepCopy(void* dst, const void* src, size_t n) {
+    (void)DeepCopy<HostSpace, HostSpace, Kokkos::Experimental::CilkPlus>(
+        dst, src, n);
+  }
 
-  inline
-  DeepCopy( const ExecutionSpace& exec, void * dst , const void * src , size_t n )
-  {
+  inline DeepCopy(const ExecutionSpace& exec, void* dst, const void* src,
+                  size_t n) {
     exec.fence();
-    DeepCopyAsyncEmu (dst,src,n);
+    DeepCopyAsyncEmu(dst, src, n);
   }
 };
 
+template <class ExecutionSpace>
+struct DeepCopy<HostSpace, Kokkos::Experimental::EmuReplicatedSpace,
+                ExecutionSpace> {
+  inline DeepCopy(void* dst, const void* src, size_t n) {
+    (void)DeepCopy<HostSpace, Kokkos::Experimental::EmuReplicatedSpace,
+                   Kokkos::Experimental::CilkPlus>(dst, src, n);
+  }
 
-template<class ExecutionSpace> struct DeepCopy< HostSpace , Kokkos::Experimental::EmuReplicatedSpace , ExecutionSpace >
-{
-  inline
-  DeepCopy( void * dst , const void * src , size_t n )
-  { (void) DeepCopy< HostSpace , Kokkos::Experimental::EmuReplicatedSpace , Kokkos::Experimental::CilkPlus >( dst , src , n ); }
-
-  inline
-  DeepCopy( const ExecutionSpace& exec, void * dst , const void * src , size_t n )
-  {
+  inline DeepCopy(const ExecutionSpace& exec, void* dst, const void* src,
+                  size_t n) {
     exec.fence();
-    DeepCopyAsyncEmu (dst,src,n);
+    DeepCopyAsyncEmu(dst, src, n);
   }
 };
 
-template<class ExecutionSpace> struct DeepCopy< HostSpace , Kokkos::Experimental::EmuStridedSpace , ExecutionSpace >
-{
-  inline
-  DeepCopy( void * dst , const void * src , size_t n )
-  { (void) DeepCopy< HostSpace , Kokkos::Experimental::EmuStridedSpace , Kokkos::Experimental::CilkPlus >( dst , src , n ); }
+template <class ExecutionSpace>
+struct DeepCopy<HostSpace, Kokkos::Experimental::EmuStridedSpace,
+                ExecutionSpace> {
+  inline DeepCopy(void* dst, const void* src, size_t n) {
+    (void)DeepCopy<HostSpace, Kokkos::Experimental::EmuStridedSpace,
+                   Kokkos::Experimental::CilkPlus>(dst, src, n);
+  }
 
-  inline
-  DeepCopy( const ExecutionSpace& exec, void * dst , const void * src , size_t n )
-  {
+  inline DeepCopy(const ExecutionSpace& exec, void* dst, const void* src,
+                  size_t n) {
     exec.fence();
-    DeepCopyAsyncEmu (dst,src,n);
+    DeepCopyAsyncEmu(dst, src, n);
   }
 };
 
-} // namespace Impl
-} // namespace Kokkos
+}  // namespace Impl
+}  // namespace Kokkos
 
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
@@ -611,73 +645,76 @@ namespace Kokkos {
 namespace Impl {
 
 /** Running in EmuLocalSpace attempting to access HostSpace: error */
-template<>
-struct VerifyExecutionCanAccessMemorySpace< Kokkos::Experimental::EmuLocalSpace , Kokkos::HostSpace >
-{
+template <>
+struct VerifyExecutionCanAccessMemorySpace<Kokkos::Experimental::EmuLocalSpace,
+                                           Kokkos::HostSpace> {
   enum { value = true };
-  KOKKOS_INLINE_FUNCTION static void verify( void ) { }
-  KOKKOS_INLINE_FUNCTION static void verify( const void * ) { }
+  KOKKOS_INLINE_FUNCTION static void verify(void) {}
+  KOKKOS_INLINE_FUNCTION static void verify(const void*) {}
 };
 
 /** Running in EmuLocalSpace accessing EmuReplicatedSpace: ok */
-template<>
-struct VerifyExecutionCanAccessMemorySpace< Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::EmuReplicatedSpace >
-{
+template <>
+struct VerifyExecutionCanAccessMemorySpace<
+    Kokkos::Experimental::EmuLocalSpace,
+    Kokkos::Experimental::EmuReplicatedSpace> {
   enum { value = true };
-  KOKKOS_INLINE_FUNCTION static void verify( void ) { }
-  KOKKOS_INLINE_FUNCTION static void verify( const void * ) { }
+  KOKKOS_INLINE_FUNCTION static void verify(void) {}
+  KOKKOS_INLINE_FUNCTION static void verify(const void*) {}
 };
 
 /** Running in EmuLocalSpace accessing EmuStridedSpace: ok */
-template<>
-struct VerifyExecutionCanAccessMemorySpace< Kokkos::Experimental::EmuLocalSpace , Kokkos::Experimental::EmuStridedSpace >
-{
+template <>
+struct VerifyExecutionCanAccessMemorySpace<
+    Kokkos::Experimental::EmuLocalSpace,
+    Kokkos::Experimental::EmuStridedSpace> {
   enum { value = true };
-  KOKKOS_INLINE_FUNCTION static void verify( void ) { }
-  KOKKOS_INLINE_FUNCTION static void verify( const void * ) { }
+  KOKKOS_INLINE_FUNCTION static void verify(void) {}
+  KOKKOS_INLINE_FUNCTION static void verify(const void*) {}
 };
 
 /** Running in EmuLocalSpace attempting to access an unknown space: error */
-template< class OtherSpace >
+template <class OtherSpace>
 struct VerifyExecutionCanAccessMemorySpace<
-  typename enable_if< ! is_same<Kokkos::Experimental::EmuLocalSpace,OtherSpace>::value , Kokkos::Experimental::EmuLocalSpace >::type ,
-  OtherSpace >
-{
+    typename enable_if<
+        !is_same<Kokkos::Experimental::EmuLocalSpace, OtherSpace>::value,
+        Kokkos::Experimental::EmuLocalSpace>::type,
+    OtherSpace> {
   enum { value = true };
-  KOKKOS_INLINE_FUNCTION static void verify( void ) { }
-  KOKKOS_INLINE_FUNCTION static void verify( const void * ) { }
+  KOKKOS_INLINE_FUNCTION static void verify(void) {}
+  KOKKOS_INLINE_FUNCTION static void verify(const void*) {}
 };
 
 //----------------------------------------------------------------------------
 /** Running in HostSpace attempting to access EmuLocalSpace */
-template<>
-struct VerifyExecutionCanAccessMemorySpace< Kokkos::HostSpace , Kokkos::Experimental::EmuLocalSpace >
-{
+template <>
+struct VerifyExecutionCanAccessMemorySpace<
+    Kokkos::HostSpace, Kokkos::Experimental::EmuLocalSpace> {
   enum { value = true };
-  KOKKOS_INLINE_FUNCTION static void verify( void ) { }
-  KOKKOS_INLINE_FUNCTION static void verify( const void * ) { }
+  KOKKOS_INLINE_FUNCTION static void verify(void) {}
+  KOKKOS_INLINE_FUNCTION static void verify(const void*) {}
 };
 
 /** Running in HostSpace accessing EmuReplicatedSpace is OK */
-template<>
-struct VerifyExecutionCanAccessMemorySpace< Kokkos::HostSpace , Kokkos::Experimental::EmuReplicatedSpace >
-{
+template <>
+struct VerifyExecutionCanAccessMemorySpace<
+    Kokkos::HostSpace, Kokkos::Experimental::EmuReplicatedSpace> {
   enum { value = true };
-  inline static void verify( void ) { }
-  inline static void verify( const void * ) { }
+  inline static void verify(void) {}
+  inline static void verify(const void*) {}
 };
 
 /** Running in HostSpace accessing EmuStridedSpace is OK */
-template<>
-struct VerifyExecutionCanAccessMemorySpace< Kokkos::HostSpace , Kokkos::Experimental::EmuStridedSpace >
-{
+template <>
+struct VerifyExecutionCanAccessMemorySpace<
+    Kokkos::HostSpace, Kokkos::Experimental::EmuStridedSpace> {
   enum { value = true };
-  KOKKOS_INLINE_FUNCTION static void verify( void ) {}
-  KOKKOS_INLINE_FUNCTION static void verify( const void * ) {}
+  KOKKOS_INLINE_FUNCTION static void verify(void) {}
+  KOKKOS_INLINE_FUNCTION static void verify(const void*) {}
 };
 
-} // Impl
-} // namespace Kokkos
+}  // namespace Impl
+}  // namespace Kokkos
 
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
@@ -685,447 +722,426 @@ struct VerifyExecutionCanAccessMemorySpace< Kokkos::HostSpace , Kokkos::Experime
 namespace Kokkos {
 namespace Impl {
 
-template<>
-class SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , void >
-  : public SharedAllocationRecord< void , void >
-{
-public:
-  typedef SharedAllocationRecord< void , void >  RecordBase ;
-private:
+template <>
+class SharedAllocationRecord<Kokkos::Experimental::EmuLocalSpace, void>
+    : public SharedAllocationRecord<void, void> {
+ public:
+  typedef SharedAllocationRecord<void, void> RecordBase;
 
-  friend class SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , void > ;
+ private:
+  friend class SharedAllocationRecord<Kokkos::Experimental::EmuReplicatedSpace,
+                                      void>;
 
-  SharedAllocationRecord( const SharedAllocationRecord & ) = delete ;
-  SharedAllocationRecord & operator = ( const SharedAllocationRecord & ) = delete ;
+  SharedAllocationRecord(const SharedAllocationRecord&) = delete;
+  SharedAllocationRecord& operator=(const SharedAllocationRecord&) = delete;
 
-  static void deallocate( RecordBase * );
+  static void deallocate(RecordBase*);
 
-  const Kokkos::Experimental::EmuLocalSpace * m_space ;
+  const Kokkos::Experimental::EmuLocalSpace* m_space;
 
-public:
-
+ public:
   ~SharedAllocationRecord();
   SharedAllocationRecord() : RecordBase(), m_space() {}
 
-  SharedAllocationRecord( RecordBase*                      basePtr
-                        , const char *                     arg_label
-                        , const size_t                     arg_alloc_size
-                        , const Kokkos::Experimental::EmuLocalSpace        * arg_space
-                        , int node
-                        , const RecordBase::function_type  arg_dealloc
-                        );
+  SharedAllocationRecord(RecordBase* basePtr, const char* arg_label,
+                         const size_t arg_alloc_size,
+                         const Kokkos::Experimental::EmuLocalSpace* arg_space,
+                         int node, const RecordBase::function_type arg_dealloc);
 
-  SharedAllocationRecord( RecordBase*                      basePtr
-                        , const char *                     arg_label
-                        , const size_t                     arg_alloc_size
-                        , const Kokkos::Experimental::EmuLocalSpace        * arg_space
-                        , int node
-                        );
+  SharedAllocationRecord(RecordBase* basePtr, const char* arg_label,
+                         const size_t arg_alloc_size,
+                         const Kokkos::Experimental::EmuLocalSpace* arg_space,
+                         int node);
 
-public:
+ public:
+  std::string get_label() const;
 
-  std::string get_label() const ;
-
-  static SharedAllocationRecord * allocate( const Kokkos::Experimental::EmuLocalSpace &  arg_space
-                                          , const std::string       &  arg_label
-                                          , const size_t               arg_alloc_size );
+  static SharedAllocationRecord* allocate(
+      const Kokkos::Experimental::EmuLocalSpace& arg_space,
+      const std::string& arg_label, const size_t arg_alloc_size);
 
   /**\brief  Allocate tracked memory in the space */
-  static 
-  void * allocate_tracked( const Kokkos::Experimental::EmuLocalSpace & arg_space
-                         , const std::string & arg_label
-                         , const size_t arg_alloc_size );
+  static void* allocate_tracked(
+      const Kokkos::Experimental::EmuLocalSpace& arg_space,
+      const std::string& arg_label, const size_t arg_alloc_size);
 
   /**\brief  Reallocate tracked memory in the space */
-  static 
-  void * reallocate_tracked( void * const arg_alloc_ptr
-                           , const size_t arg_alloc_size );
+  static void* reallocate_tracked(void* const arg_alloc_ptr,
+                                  const size_t arg_alloc_size);
 
   /**\brief  Deallocate tracked memory in the space */
-  static  
-  void deallocate_tracked( void * const arg_alloc_ptr );
+  static void deallocate_tracked(void* const arg_alloc_ptr);
 
-  static SharedAllocationRecord * get_record( void * arg_alloc_ptr );
+  static SharedAllocationRecord* get_record(void* arg_alloc_ptr);
 
-  static void print_records( std::ostream & , const Kokkos::Experimental::EmuLocalSpace & , bool detail = false );
+  static void print_records(std::ostream&,
+                            const Kokkos::Experimental::EmuLocalSpace&,
+                            bool detail = false);
 };
 
+template <>
+class SharedAllocationRecord<Kokkos::Experimental::EmuReplicatedSpace, void>
+    : public SharedAllocationRecord<void, void> {
+ public:
+  typedef SharedAllocationRecord<void, void> RecordBase;
 
-template<>
-class SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , void >
-  : public SharedAllocationRecord< void , void >
-{
-public:
-  typedef SharedAllocationRecord< void , void >  RecordBase ;
+ private:
+  SharedAllocationRecord(const SharedAllocationRecord&) = delete;
+  SharedAllocationRecord& operator=(const SharedAllocationRecord&) = delete;
 
-private:
-  SharedAllocationRecord( const SharedAllocationRecord & ) = delete ;
-  SharedAllocationRecord & operator = ( const SharedAllocationRecord & ) = delete ;
+  static void deallocate(RecordBase*);
 
-  static void deallocate( RecordBase * );
+  // const Kokkos::Experimental::EmuReplicatedSpace * m_space ;
 
-  //const Kokkos::Experimental::EmuReplicatedSpace * m_space ;
-
-public:
-  static void increment_repl_count ( int i, Kokkos::Impl::SharedAllocationRecord<void,void>* pRec );
+ public:
+  static void increment_repl_count(
+      int i, Kokkos::Impl::SharedAllocationRecord<void, void>* pRec);
   ~SharedAllocationRecord();
   SharedAllocationRecord() : RecordBase() {}
 
-  SharedAllocationRecord( RecordBase*                      basePtr
-                        , const char *                     arg_label
-                        , const size_t                     arg_alloc_size
-                        , void *                           arg_ptr
-                        , int node
-                        , const RecordBase::function_type  arg_dealloc
-                        );
+  SharedAllocationRecord(RecordBase* basePtr, const char* arg_label,
+                         const size_t arg_alloc_size, void* arg_ptr, int node,
+                         const RecordBase::function_type arg_dealloc);
 
-  SharedAllocationRecord( RecordBase*                      basePtr
-                        , const char *                     arg_label
-                        , const size_t                     arg_alloc_size
-                        , void *                           arg_ptr
-                        , int node
-                        );
+  SharedAllocationRecord(RecordBase* basePtr, const char* arg_label,
+                         const size_t arg_alloc_size, void* arg_ptr, int node);
 
+ public:
+  static void custom_increment(
+      Kokkos::Impl::SharedAllocationRecord<void, void>*);
 
-public:
-  static void custom_increment( Kokkos::Impl::SharedAllocationRecord<void, void> * );
+  static Kokkos::Impl::SharedAllocationRecord<void, void>* custom_decrement(
+      Kokkos::Impl::SharedAllocationRecord<void, void>*);
 
-  static Kokkos::Impl::SharedAllocationRecord<void, void> * custom_decrement( Kokkos::Impl::SharedAllocationRecord<void, void> * );
+  std::string get_label() const;
 
-
-  std::string get_label() const ;
-
-  static SharedAllocationRecord * allocate( const char *                  arg_label
-                                          , const size_t                  arg_alloc_size
-                                          );
+  static SharedAllocationRecord* allocate(const char* arg_label,
+                                          const size_t arg_alloc_size);
 
   /**\brief  Allocate tracked memory in the space */
-  static 
-  void * allocate_tracked( const Kokkos::Experimental::EmuReplicatedSpace & arg_space
-                         , const std::string & arg_label
-                         , const size_t arg_alloc_size );
+  static void* allocate_tracked(
+      const Kokkos::Experimental::EmuReplicatedSpace& arg_space,
+      const std::string& arg_label, const size_t arg_alloc_size);
 
   /**\brief  Reallocate tracked memory in the space */
-  static
-  void * reallocate_tracked( void * const arg_alloc_ptr
-                           , const size_t arg_alloc_size );
+  static void* reallocate_tracked(void* const arg_alloc_ptr,
+                                  const size_t arg_alloc_size);
 
   /**\brief  Deallocate tracked memory in the space */
-  static
-  void deallocate_tracked( void * const arg_alloc_ptr );
+  static void deallocate_tracked(void* const arg_alloc_ptr);
 
-  static SharedAllocationRecord * get_record( void * arg_alloc_ptr );
+  static SharedAllocationRecord* get_record(void* arg_alloc_ptr);
 
-  static void print_records( std::ostream & , const Kokkos::Experimental::EmuReplicatedSpace & , bool detail = false );
+  static void print_records(std::ostream&,
+                            const Kokkos::Experimental::EmuReplicatedSpace&,
+                            bool detail = false);
 };
 
 class EmuStridedAllocationHeader : public SharedAllocationHeader {
-public:
-   void * m_stridedData;
+ public:
+  void* m_stridedData;
 };
 
+template <>
+class SharedAllocationRecord<Kokkos::Experimental::EmuStridedSpace, void>
+    : public SharedAllocationRecord<void, void> {
+ public:
+  typedef SharedAllocationRecord<void, void> RecordBase;
 
-template<>
-class SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void >
-  : public SharedAllocationRecord< void , void >
-{
-public:
-  typedef SharedAllocationRecord< void , void >  RecordBase ;
+ private:
+  SharedAllocationRecord(const SharedAllocationRecord&) = delete;
+  SharedAllocationRecord& operator=(const SharedAllocationRecord&) = delete;
 
-private:
+  static void deallocate(RecordBase*);
 
-  SharedAllocationRecord( const SharedAllocationRecord & ) = delete ;
-  SharedAllocationRecord & operator = ( const SharedAllocationRecord & ) = delete ;
-
-  static void deallocate( RecordBase * );
-
-public:
-
+ public:
   ~SharedAllocationRecord();
   SharedAllocationRecord() : RecordBase() {}
 
-  SharedAllocationRecord( RecordBase*                      basePtr
-                        , const char *                     arg_label
-                        , const size_t                     arg_alloc_size
-                        , void *                           arg_ptr
-                        , void *                           data_ptr
-                        , int node
-                        , const RecordBase::function_type  arg_dealloc
-                        );
+  SharedAllocationRecord(RecordBase* basePtr, const char* arg_label,
+                         const size_t arg_alloc_size, void* arg_ptr,
+                         void* data_ptr, int node,
+                         const RecordBase::function_type arg_dealloc);
 
-  SharedAllocationRecord( RecordBase*                      basePtr
-                        , const char *                     arg_label
-                        , const size_t                     arg_alloc_size
-                        , void *                           arg_ptr
-                        , void *                           data_ptr
-                        , int node
-                        );
+  SharedAllocationRecord(RecordBase* basePtr, const char* arg_label,
+                         const size_t arg_alloc_size, void* arg_ptr,
+                         void* data_ptr, int node);
 
-public:
+ public:
+  static void custom_increment(
+      Kokkos::Impl::SharedAllocationRecord<void, void>*);
 
-  static void custom_increment( Kokkos::Impl::SharedAllocationRecord<void, void> * );
+  static Kokkos::Impl::SharedAllocationRecord<void, void>* custom_decrement(
+      Kokkos::Impl::SharedAllocationRecord<void, void>*);
 
-  static Kokkos::Impl::SharedAllocationRecord<void, void> * custom_decrement( Kokkos::Impl::SharedAllocationRecord<void, void> * );
+  std::string get_label() const;
 
-  std::string get_label() const ;
-  
   /* User's memory begins at the end of the header */
   KOKKOS_INLINE_FUNCTION
-  void * data() const { 
-	  EmuStridedAllocationHeader * pEmuHead = (EmuStridedAllocationHeader*)RecordBase::m_alloc_ptr;  
-	  return reinterpret_cast<void*>( pEmuHead->m_stridedData ); }
-	  
-  static SharedAllocationRecord * allocate( const char *                  arg_label
-                                          , const size_t                  arg_alloc_size
-                                          );
+  void* data() const {
+    EmuStridedAllocationHeader* pEmuHead =
+        (EmuStridedAllocationHeader*)RecordBase::m_alloc_ptr;
+    return reinterpret_cast<void*>(pEmuHead->m_stridedData);
+  }
+
+  static SharedAllocationRecord* allocate(const char* arg_label,
+                                          const size_t arg_alloc_size);
   /**\brief  Allocate tracked memory in the space */
-  static
-  void * allocate_tracked( const Kokkos::Experimental::EmuStridedSpace & arg_space
-                         , const std::string & arg_label
-                         , const size_t arg_alloc_size );
+  static void* allocate_tracked(
+      const Kokkos::Experimental::EmuStridedSpace& arg_space,
+      const std::string& arg_label, const size_t arg_alloc_size);
 
   /**\brief  Reallocate tracked memory in the space */
-  static
-  void * reallocate_tracked( void * const arg_alloc_ptr
-                           , const size_t arg_alloc_size );
+  static void* reallocate_tracked(void* const arg_alloc_ptr,
+                                  const size_t arg_alloc_size);
 
   /**\brief  Deallocate tracked memory in the space */
-  static
-  void deallocate_tracked( void * const arg_alloc_ptr );
+  static void deallocate_tracked(void* const arg_alloc_ptr);
 
+  static SharedAllocationRecord* get_record(void* arg_alloc_ptr);
 
-  static SharedAllocationRecord * get_record( void * arg_alloc_ptr );
-
-  static void print_records( std::ostream & , const Kokkos::Experimental::EmuStridedSpace & , bool detail = false );
+  static void print_records(std::ostream&,
+                            const Kokkos::Experimental::EmuStridedSpace&,
+                            bool detail = false);
 };
 
-template< class DestroyFunctor >
-class SharedAllocationRecord<Kokkos::Experimental::EmuLocalSpace, DestroyFunctor> : 
-       public SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , void >
-{
-public:
-  typedef SharedAllocationRecord< void , void >  RecordBase ;
+template <class DestroyFunctor>
+class SharedAllocationRecord<Kokkos::Experimental::EmuLocalSpace,
+                             DestroyFunctor>
+    : public SharedAllocationRecord<Kokkos::Experimental::EmuLocalSpace, void> {
+ public:
+  typedef SharedAllocationRecord<void, void> RecordBase;
 
-  SharedAllocationRecord( RecordBase*         basePtr
-                        , const char *        arg_label
-                        , const size_t        arg_alloc
-                        , const Kokkos::Experimental::EmuLocalSpace * arg_space
-                        , int node_id
-                        )
-    /*  Allocate user memory as [ SharedAllocationHeader , user_memory ] */
-    : SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , void >( basePtr , arg_label , arg_alloc , 
-                                                       arg_space, node_id, 
-                                                       & Kokkos::Impl::deallocate< Kokkos::Experimental::EmuLocalSpace , DestroyFunctor > )
-    , m_destroy()
-    {
-     //printf("custom destroy function constructor\n");
-    }
+  SharedAllocationRecord(RecordBase* basePtr, const char* arg_label,
+                         const size_t arg_alloc,
+                         const Kokkos::Experimental::EmuLocalSpace* arg_space,
+                         int node_id)
+      /*  Allocate user memory as [ SharedAllocationHeader , user_memory ] */
+      : SharedAllocationRecord<Kokkos::Experimental::EmuLocalSpace, void>(
+            basePtr, arg_label, arg_alloc, arg_space, node_id,
+            &Kokkos::Impl::deallocate<Kokkos::Experimental::EmuLocalSpace,
+                                      DestroyFunctor>),
+        m_destroy() {
+    // printf("custom destroy function constructor\n");
+  }
 
-private:
-  SharedAllocationRecord() = delete ;
-  SharedAllocationRecord( const SharedAllocationRecord & ) = delete ;
-  SharedAllocationRecord & operator = ( const SharedAllocationRecord & ) = delete ;
+ private:
+  SharedAllocationRecord()                              = delete;
+  SharedAllocationRecord(const SharedAllocationRecord&) = delete;
+  SharedAllocationRecord& operator=(const SharedAllocationRecord&) = delete;
 
-public:
+ public:
+  DestroyFunctor m_destroy;
 
-  DestroyFunctor  m_destroy ;
-
-  // Allocate with a zero use count.  Incrementing the use count from zero to one
-  // inserts the record into the tracking list.  Decrementing the count from one to zero
-  // removes from the trakcing list and deallocates.
-  KOKKOS_INLINE_FUNCTION static
-  SharedAllocationRecord * allocate( const Kokkos::Experimental::EmuLocalSpace & arg_space
-                                   , const std::string & arg_label
-                                   , const size_t        arg_alloc
-                                   );
+  // Allocate with a zero use count.  Incrementing the use count from zero to
+  // one inserts the record into the tracking list.  Decrementing the count from
+  // one to zero removes from the trakcing list and deallocates.
+  KOKKOS_INLINE_FUNCTION static SharedAllocationRecord* allocate(
+      const Kokkos::Experimental::EmuLocalSpace& arg_space,
+      const std::string& arg_label, const size_t arg_alloc);
 };
 
+template <class DestroyFunctor>
+class SharedAllocationRecord<Kokkos::Experimental::EmuReplicatedSpace,
+                             DestroyFunctor>
+    : public SharedAllocationRecord<Kokkos::Experimental::EmuReplicatedSpace,
+                                    void> {
+ public:
+  typedef SharedAllocationRecord<void, void> RecordBase;
 
-template< class DestroyFunctor >
-class SharedAllocationRecord<Kokkos::Experimental::EmuReplicatedSpace, DestroyFunctor> : 
-       public SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , void >
-{
-public:
-  typedef SharedAllocationRecord< void , void >  RecordBase ;
+  SharedAllocationRecord(RecordBase* basePtr, const char* arg_label,
+                         const size_t arg_alloc, void* arg_ptr, int node_id)
+      /*  Allocate user memory as [ SharedAllocationHeader , user_memory ] */
+      : SharedAllocationRecord<Kokkos::Experimental::EmuReplicatedSpace, void>(
+            basePtr, arg_label, arg_alloc, arg_ptr, node_id,
+            &Kokkos::Impl::deallocate<Kokkos::Experimental::EmuReplicatedSpace,
+                                      DestroyFunctor>),
+        m_destroy() {
+    // printf("custom destroy function constructor\n");
+  }
 
+ private:
+  SharedAllocationRecord()                              = delete;
+  SharedAllocationRecord(const SharedAllocationRecord&) = delete;
+  SharedAllocationRecord& operator=(const SharedAllocationRecord&) = delete;
 
-  SharedAllocationRecord( RecordBase*         basePtr
-                        , const char *        arg_label
-                        , const size_t        arg_alloc
-                        , void *              arg_ptr
-                        , int node_id
-                        )
-    /*  Allocate user memory as [ SharedAllocationHeader , user_memory ] */
-    : SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , void >( basePtr , arg_label , arg_alloc , arg_ptr, node_id, 
-                                                       & Kokkos::Impl::deallocate< Kokkos::Experimental::EmuReplicatedSpace , DestroyFunctor > )
-    , m_destroy()
-    {
-     //printf("custom destroy function constructor\n");
-    }
+ public:
+  DestroyFunctor m_destroy;
 
-private:
-  SharedAllocationRecord() = delete ;
-  SharedAllocationRecord( const SharedAllocationRecord & ) = delete ;
-  SharedAllocationRecord & operator = ( const SharedAllocationRecord & ) = delete ;
-
-public:
-
-  DestroyFunctor  m_destroy ;
-
-  // Allocate with a zero use count.  Incrementing the use count from zero to one
-  // inserts the record into the tracking list.  Decrementing the count from one to zero
-  // removes from the trakcing list and deallocates.
-  KOKKOS_INLINE_FUNCTION static
-  SharedAllocationRecord * allocate( const Kokkos::Experimental::EmuReplicatedSpace & arg_space
-                                   , const std::string & arg_label
-                                   , const size_t        arg_alloc
-                                   );
+  // Allocate with a zero use count.  Incrementing the use count from zero to
+  // one inserts the record into the tracking list.  Decrementing the count from
+  // one to zero removes from the trakcing list and deallocates.
+  KOKKOS_INLINE_FUNCTION static SharedAllocationRecord* allocate(
+      const Kokkos::Experimental::EmuReplicatedSpace& arg_space,
+      const std::string& arg_label, const size_t arg_alloc);
 };
 
+template <class DestroyFunctor>
+class SharedAllocationRecord<Kokkos::Experimental::EmuStridedSpace,
+                             DestroyFunctor>
+    : public SharedAllocationRecord<Kokkos::Experimental::EmuStridedSpace,
+                                    void> {
+ public:
+  typedef SharedAllocationRecord<void, void> RecordBase;
 
-template< class DestroyFunctor >
-class SharedAllocationRecord<Kokkos::Experimental::EmuStridedSpace, DestroyFunctor> : 
-       public SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void >
-{
-public:
-  typedef SharedAllocationRecord< void , void >  RecordBase ;
+  SharedAllocationRecord(RecordBase* basePtr, const char* arg_label,
+                         const size_t arg_alloc, void* arg_ptr, void* data_ptr,
+                         int node_id)
+      /*  Allocate user memory as [ SharedAllocationHeader , user_memory ] */
+      : SharedAllocationRecord<Kokkos::Experimental::EmuStridedSpace, void>(
+            basePtr, arg_label, arg_alloc, arg_ptr, data_ptr, node_id,
+            &Kokkos::Impl::deallocate<Kokkos::Experimental::EmuStridedSpace,
+                                      DestroyFunctor>),
+        m_destroy() {
+    // printf("custom destroy function constructor\n");
+  }
 
+ private:
+  SharedAllocationRecord()                              = delete;
+  SharedAllocationRecord(const SharedAllocationRecord&) = delete;
+  SharedAllocationRecord& operator=(const SharedAllocationRecord&) = delete;
 
-  SharedAllocationRecord( RecordBase*         basePtr
-                        , const char *        arg_label
-                        , const size_t        arg_alloc
-                        , void *              arg_ptr
-                        , void *              data_ptr
-                        , int node_id
-                        )
-    /*  Allocate user memory as [ SharedAllocationHeader , user_memory ] */
-    : SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , void >( basePtr , arg_label , arg_alloc , arg_ptr, data_ptr, node_id, 
-                                                       & Kokkos::Impl::deallocate< Kokkos::Experimental::EmuStridedSpace , DestroyFunctor > )
-    , m_destroy()
-    {
-      //printf("custom destroy function constructor\n");
-    }
+ protected:
+  static void local_sp_alloc(int i, void* vr, void* vh, const char* szLabel,
+                             const size_t arg_alloc, void* vd);
 
-private:
-  SharedAllocationRecord() = delete ;
-  SharedAllocationRecord( const SharedAllocationRecord & ) = delete ;
-  SharedAllocationRecord & operator = ( const SharedAllocationRecord & ) = delete ;
+ public:
+  DestroyFunctor m_destroy;
 
-protected:
-   static void local_sp_alloc(int i, void * vr, void * vh, const char * szLabel, const size_t arg_alloc, void * vd);
-public:
+  // Allocate with a zero use count.  Incrementing the use count from zero to
+  // one inserts the record into the tracking list.  Decrementing the count from
+  // one to zero removes from the trakcing list and deallocates.
+  KOKKOS_INLINE_FUNCTION static SharedAllocationRecord* allocate(
+      const Kokkos::Experimental::EmuStridedSpace& arg_space,
+      const std::string& arg_label, const size_t arg_alloc);
 
-  DestroyFunctor  m_destroy ;
-
-  // Allocate with a zero use count.  Incrementing the use count from zero to one
-  // inserts the record into the tracking list.  Decrementing the count from one to zero
-  // removes from the trakcing list and deallocates.
-  KOKKOS_INLINE_FUNCTION static
-  SharedAllocationRecord * allocate( const Kokkos::Experimental::EmuStridedSpace & arg_space
-                                   , const std::string & arg_label
-                                   , const size_t        arg_alloc
-                                   );
-                                   
   /* User's memory begins at the end of the header */
   KOKKOS_INLINE_FUNCTION
-  void * data() const { 
-	  EmuStridedAllocationHeader * pEmuHead = (EmuStridedAllocationHeader*)RecordBase::m_alloc_ptr;  
-	  return reinterpret_cast<void*>( pEmuHead->m_stridedData ); }
-                                   
+  void* data() const {
+    EmuStridedAllocationHeader* pEmuHead =
+        (EmuStridedAllocationHeader*)RecordBase::m_alloc_ptr;
+    return reinterpret_cast<void*>(pEmuHead->m_stridedData);
+  }
 };
 
+template <class DestroyFunctor>
+SharedAllocationRecord<Kokkos::Experimental::EmuReplicatedSpace,
+                       DestroyFunctor>*
+SharedAllocationRecord<Kokkos::Experimental::EmuReplicatedSpace,
+                       DestroyFunctor>::
+    allocate(const Kokkos::Experimental::EmuReplicatedSpace& arg_space,
+             const std::string& arg_label, const size_t arg_alloc) {
+  typedef SharedAllocationRecord<Kokkos::Experimental::EmuReplicatedSpace,
+                                 DestroyFunctor>
+      repl_shared_rec;
 
-template< class DestroyFunctor >
-SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , DestroyFunctor > *
-SharedAllocationRecord<Kokkos::Experimental::EmuReplicatedSpace, DestroyFunctor>::
-allocate( const Kokkos::Experimental::EmuReplicatedSpace & arg_space
-        , const std::string & arg_label
-        , const size_t        arg_alloc
-        )
-{
-   typedef SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , DestroyFunctor > repl_shared_rec;
+  long* lRef = (long*)Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
+  Kokkos::Experimental::EmuReplicatedSpace* pMem =
+      ((Kokkos::Experimental::EmuReplicatedSpace*)
+           Kokkos::Experimental::EmuReplicatedSpace::ers);
+  void* vr = pMem->allocate(sizeof(repl_shared_rec));
+  void* vh = pMem->allocate(sizeof(SharedAllocationHeader) + arg_alloc);
+  const char* szLabel = arg_label.c_str();
 
-   long * lRef = (long*)Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
-   Kokkos::Experimental::EmuReplicatedSpace* pMem = ((Kokkos::Experimental::EmuReplicatedSpace*)Kokkos::Experimental::EmuReplicatedSpace::ers);
-   void *vr = pMem->allocate(sizeof(repl_shared_rec));
-   void *vh = pMem->allocate(sizeof(SharedAllocationHeader) + arg_alloc);   
-   const char * szLabel = arg_label.c_str();
-                          
-   for ( int i = 0; i < NODELETS(); i++) {
-      repl_shared_rec * pRec = (repl_shared_rec*)mw_get_localto(vr,&lRef[i]);
-      SharedAllocationHeader* pH = (SharedAllocationHeader*)mw_get_localto(vh, &lRef[i]);
-      repl_shared_rec::RecordBase* rb = (repl_shared_rec::RecordBase*)mw_get_localto(Kokkos::Experimental::EmuReplicatedSpace::repl_root_record, &lRef[i]);
-      new (pRec) repl_shared_rec( rb, szLabel, arg_alloc, pH, i );
-   }
-   return (SharedAllocationRecord< Kokkos::Experimental::EmuReplicatedSpace , DestroyFunctor >*)vr;
+  for (int i = 0; i < NODELETS(); i++) {
+    repl_shared_rec* pRec = (repl_shared_rec*)mw_get_localto(vr, &lRef[i]);
+    SharedAllocationHeader* pH =
+        (SharedAllocationHeader*)mw_get_localto(vh, &lRef[i]);
+    repl_shared_rec::RecordBase* rb =
+        (repl_shared_rec::RecordBase*)mw_get_localto(
+            Kokkos::Experimental::EmuReplicatedSpace::repl_root_record,
+            &lRef[i]);
+    new (pRec) repl_shared_rec(rb, szLabel, arg_alloc, pH, i);
+  }
+  return (SharedAllocationRecord<Kokkos::Experimental::EmuReplicatedSpace,
+                                 DestroyFunctor>*)vr;
 }
 
-template< class DestroyFunctor >
-SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , DestroyFunctor > *
+template <class DestroyFunctor>
+SharedAllocationRecord<Kokkos::Experimental::EmuLocalSpace, DestroyFunctor>*
 SharedAllocationRecord<Kokkos::Experimental::EmuLocalSpace, DestroyFunctor>::
-allocate( const Kokkos::Experimental::EmuLocalSpace & arg_space
-        , const std::string & arg_label
-        , const size_t        arg_alloc
-        )
-{
-   typedef SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , DestroyFunctor > local_shared_rec;
-   const char * szLabel = arg_label.c_str();
-                          
-   local_shared_rec * pRec = (local_shared_rec*)arg_space.allocate(sizeof(local_shared_rec)); 
-   local_shared_rec::RecordBase* rb = (local_shared_rec::RecordBase*)mw_get_localto(Kokkos::Experimental::EmuLocalSpace::local_root_record, pRec);
-   new (pRec) local_shared_rec( rb, szLabel, arg_alloc, &arg_space, (int)NODE_ID() );
-   return (SharedAllocationRecord< Kokkos::Experimental::EmuLocalSpace , DestroyFunctor >*)pRec;
+    allocate(const Kokkos::Experimental::EmuLocalSpace& arg_space,
+             const std::string& arg_label, const size_t arg_alloc) {
+  typedef SharedAllocationRecord<Kokkos::Experimental::EmuLocalSpace,
+                                 DestroyFunctor>
+      local_shared_rec;
+  const char* szLabel = arg_label.c_str();
+
+  local_shared_rec* pRec =
+      (local_shared_rec*)arg_space.allocate(sizeof(local_shared_rec));
+  local_shared_rec::RecordBase* rb =
+      (local_shared_rec::RecordBase*)mw_get_localto(
+          Kokkos::Experimental::EmuLocalSpace::local_root_record, pRec);
+  new (pRec)
+      local_shared_rec(rb, szLabel, arg_alloc, &arg_space, (int)NODE_ID());
+  return (SharedAllocationRecord<Kokkos::Experimental::EmuLocalSpace,
+                                 DestroyFunctor>*)pRec;
 }
 
-template< class DestroyFunctor >
-void 
+template <class DestroyFunctor>
+void SharedAllocationRecord<Kokkos::Experimental::EmuStridedSpace,
+                            DestroyFunctor>::local_sp_alloc(int i, void* vr,
+                                                            void* vh,
+                                                            const char* szLabel,
+                                                            const size_t
+                                                                arg_alloc,
+                                                            void* vd) {
+  typedef SharedAllocationRecord<Kokkos::Experimental::EmuStridedSpace,
+                                 DestroyFunctor>
+      strided_shared_rec;
+  strided_shared_rec* pRec   = (strided_shared_rec*)mw_get_nth(vr, i);
+  SharedAllocationHeader* pH = (SharedAllocationHeader*)mw_get_nth(vh, i);
+  strided_shared_rec::RecordBase* rb =
+      (strided_shared_rec::RecordBase*)mw_get_nth(
+          Kokkos::Experimental::EmuStridedSpace::strided_root_record, i);
+  new (pRec) strided_shared_rec(
+      rb, (const char*)&szLabel[0], arg_alloc, pH, vd,
+      i);  // each replica of the record/header points to the same memory head.
+}
+
+template <class DestroyFunctor>
+SharedAllocationRecord<Kokkos::Experimental::EmuStridedSpace, DestroyFunctor>*
 SharedAllocationRecord<Kokkos::Experimental::EmuStridedSpace, DestroyFunctor>::
-local_sp_alloc(int i, void * vr, void * vh, const char * szLabel, const size_t arg_alloc, void * vd) {
-   typedef SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , DestroyFunctor > strided_shared_rec;	
-      strided_shared_rec * pRec = (strided_shared_rec*)mw_get_nth(vr,i);
-      SharedAllocationHeader* pH = (SharedAllocationHeader*)mw_get_nth(vh, i);
-      strided_shared_rec::RecordBase* rb = (strided_shared_rec::RecordBase*)mw_get_nth(
-                                    Kokkos::Experimental::EmuStridedSpace::strided_root_record, i);
-      new (pRec) strided_shared_rec( rb, (const char*)&szLabel[0], arg_alloc, pH, vd, i );  // each replica of the record/header points to the same memory head.      
+    allocate(const Kokkos::Experimental::EmuStridedSpace& arg_space,
+             const std::string& arg_label, const size_t arg_alloc) {
+  typedef SharedAllocationRecord<Kokkos::Experimental::EmuStridedSpace,
+                                 DestroyFunctor>
+      strided_shared_rec;
+  char szLabel[255];
+  strcpy(szLabel, arg_label.c_str());
+  // printf("strided specialized record allocator: %s \n", szLabel);
+  // fflush(stdout);
+  Kokkos::Experimental::EmuStridedSpace* pMem =
+      (Kokkos::Experimental::EmuStridedSpace*)
+          Kokkos::Experimental::EmuStridedSpace::ess;
+  Kokkos::Experimental::EmuReplicatedSpace* pRepl =
+      (Kokkos::Experimental::EmuReplicatedSpace*)
+          Kokkos::Experimental::EmuReplicatedSpace::ers;
+
+  void* vr = pRepl->allocate(
+      sizeof(strided_shared_rec));  // allocate the record replicated...
+  void* vh = pRepl->allocate(
+      sizeof(EmuStridedAllocationHeader));  // allocate the header replicated...
+  void* vd = pMem->allocate(arg_alloc);     // This is the strided memory
+
+  long* lRef = (long*)*(
+      (long*)((long*)*Kokkos::Experimental::EmuReplicatedSpace::ref_addr));
+  for (int i = 0; i < *Kokkos::Experimental::EmuReplicatedSpace::node_count;
+       i++) {
+    cilk_spawn_at(&lRef[i]) local_sp_alloc(i, vr, vh, szLabel, arg_alloc, vd);
+  }
+  cilk_sync;
+  // printf("return from EmuStrided allocate \n");
+  // fflush(stdout);
+  return (SharedAllocationRecord<Kokkos::Experimental::EmuStridedSpace,
+                                 DestroyFunctor>*)vr;
 }
 
-template< class DestroyFunctor >
-SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , DestroyFunctor > *
-SharedAllocationRecord<Kokkos::Experimental::EmuStridedSpace, DestroyFunctor>::
-allocate( const Kokkos::Experimental::EmuStridedSpace & arg_space
-        , const std::string & arg_label
-        , const size_t        arg_alloc
-        )
-{
-   typedef SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , DestroyFunctor > strided_shared_rec;	
-   char szLabel[255];
-   strcpy(szLabel, arg_label.c_str());
-   //printf("strided specialized record allocator: %s \n", szLabel);
-   //fflush(stdout);
-   Kokkos::Experimental::EmuStridedSpace* pMem = (Kokkos::Experimental::EmuStridedSpace*)Kokkos::Experimental::EmuStridedSpace::ess;
-   Kokkos::Experimental::EmuReplicatedSpace* pRepl = (Kokkos::Experimental::EmuReplicatedSpace*)Kokkos::Experimental::EmuReplicatedSpace::ers;
-
-   void *vr = pRepl->allocate(sizeof(strided_shared_rec));      // allocate the record replicated...
-   void *vh = pRepl->allocate(sizeof(EmuStridedAllocationHeader)); // allocate the header replicated...
-   void *vd = pMem->allocate(arg_alloc);  // This is the strided memory
-
-   long* lRef = (long*)*((long*)((long*)*Kokkos::Experimental::EmuReplicatedSpace::ref_addr));
-   for ( int i = 0; i < *Kokkos::Experimental::EmuReplicatedSpace::node_count; i++) {
-	  cilk_spawn_at(&lRef[i]) local_sp_alloc(i, vr, vh, szLabel, arg_alloc, vd);
-   }
-   cilk_sync;
-   //printf("return from EmuStrided allocate \n");
-   //fflush(stdout);
-   return (SharedAllocationRecord< Kokkos::Experimental::EmuStridedSpace , DestroyFunctor >*)vr;
-}
-
-
-} // Impl
-} // namespace Kokkos
+}  // namespace Impl
+}  // namespace Kokkos
 
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
 
 #endif /* #if defined( KOKKOS_ENABLE_EMU ) */
 #endif /* #define KOKKOS_EmuLocalSpace_HPP */
-
