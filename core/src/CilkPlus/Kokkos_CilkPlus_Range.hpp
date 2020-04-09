@@ -11,7 +11,7 @@
 #include <pmanip.h>
 
 //#define KOKKOS_CILK_USE_PARALLEL_FOR
-#define MAX_THREAD_COUNT 32
+
 /*--------------------------------------------------------------------------*/
 /*--------------------------------------------------------------------------*/
 /* Parallel patterns for Kokkos::Experimental::CilkPlus with RangePolicy */
@@ -81,7 +81,8 @@ private:
       const typename Policy::member_type e = m_policy.end();
       const typename Policy::member_type b = m_policy.begin();
       const typename Policy::member_type len = e-b;
-      const typename Policy::member_type par_loop = len > MAX_THREAD_COUNT ? MAX_THREAD_COUNT: len;
+      const typename Policy::member_type par_loop = len > Kokkos::Experimental::CilkPlus::thread_pool_size(0) ? 
+                                                          Kokkos::Experimental::CilkPlus::thread_pool_size(0) : len;
       typename Policy::member_type int_loop = 1;
       if ( par_loop > 0 )
           int_loop = (len / par_loop) + ( ( (len % par_loop) == 0) ? 0 : 1 );
@@ -122,7 +123,8 @@ private:
       const typename Policy::member_type e = m_policy.end();
       const typename Policy::member_type b = m_policy.begin();
       const typename Policy::member_type len = e-b;
-      const typename Policy::member_type par_loop = len > MAX_THREAD_COUNT ? MAX_THREAD_COUNT : len;
+      const typename Policy::member_type par_loop = len > Kokkos::Experimental::CilkPlus::thread_pool_size(0) ? 
+                                                          Kokkos::Experimental::CilkPlus::thread_pool_size(0) : len;
       typename Policy::member_type int_loop = 1;
       if ( par_loop > 0 )
           int_loop = (len / par_loop) + ( ( (len % par_loop) == 0) ? 0 : 1 );
@@ -164,6 +166,130 @@ public:
     , m_policy(  arg_policy )
     {}
 };
+
+
+template< class FunctorType , class ... Properties >
+class ParallelFor< FunctorType
+                 , Kokkos::TeamPolicy< Properties ... >
+                 , Kokkos::Experimental::CilkPlus
+                 >
+{
+private:
+
+  enum { TEAM_REDUCE_SIZE = 512 };
+
+  typedef Kokkos::Impl::TeamPolicyInternal< Kokkos::Experimental::CilkPlus, Properties ... > Policy ;
+  typedef typename Policy::work_tag             WorkTag ;
+  typedef typename Policy::schedule_type::type  SchedTag ;
+  typedef typename Policy::member_type          Member ;
+
+  const FunctorType    m_functor;
+  const Policy         m_policy;
+  const int            m_shmem_size;
+
+  template< class TagType >
+  inline static
+  typename std::enable_if< ( std::is_same< TagType , void >::value ) >::type
+  exec_team( const FunctorType & functor
+           , HostThreadTeamData & data
+           , const int league_rank_begin
+           , const int league_rank_end
+           , const int league_size )
+    {
+      for ( int r = league_rank_begin ; r < league_rank_end ; ) {
+
+        functor( Member( data, r , league_size ) );
+
+        if ( ++r < league_rank_end ) {
+          // Don't allow team members to lap one another
+          // so that they don't overwrite shared memory.
+          if ( data.team_rendezvous() ) { data.team_rendezvous_release(); }
+        }
+      }
+    }
+
+
+  template< class TagType >
+  inline static
+  typename std::enable_if< ( ! std::is_same< TagType , void >::value ) >::type
+  exec_team( const FunctorType & functor
+           , HostThreadTeamData & data
+           , const int rank_begin
+           , const int rank_end
+           , const int league_size )
+    {
+      const TagType t{};
+
+      for ( int r = league_rank_begin ; r < league_rank_end ; ) {
+
+        functor( t , Member( data, r , league_size ) );
+
+        if ( ++r < league_rank_end ) {
+          // Don't allow team members to lap one another
+          // so that they don't overwrite shared memory.
+          if ( data.team_rendezvous() ) { data.team_rendezvous_release(); }
+        }
+      }
+    }
+    
+    void launch_exec_thread( int league_rank, int team_rank ) {
+       std::pair<int64_t,int64_t> range(0,0);
+       enum { is_dynamic = std::is_same< SchedTag , Kokkos::Dynamic >::value };
+       
+       do {
+
+          range = is_dynamic ? data.get_work_stealing_chunk()
+                             : data.get_work_partition();
+
+          ParallelFor::template exec_team< WorkTag >
+              ( m_functor , data
+              , range.first , range.second , m_policy.league_size() );
+
+        } while ( is_dynamic && 0 <= range.first );
+
+	}
+    
+    void launch_exec_team(int league_rank) {
+		
+        for (int j = 0; j < m_policy.team_size(); j++) {
+			cilk_spawn launch_exec_thread( league_rank, league_size );
+		}      
+
+	}
+
+public:
+
+  inline
+  void execute() const
+    {
+      const size_t pool_reduce_size = 0 ; // Never shrinks
+      const size_t team_reduce_size = TEAM_REDUCE_SIZE * m_policy.team_size();
+      const size_t team_shared_size = m_shmem_size + m_policy.scratch_size(1);
+      const size_t thread_local_size = 0 ; // Never shrinks
+      long * pRef = Kokkos::Experimental::EmuReplicatedSpace::getRefAddr();
+
+      for (int i = 0; i < m_policy.league_size(); i++) {
+		  cilk_spawn_at(&pRef[i%Kokkos::Experimental::EmuReplicatedSpace::memory_zones()])
+		       launch_exec_team(i);
+      }
+      cilk_sync;
+    }
+
+
+  inline
+  ParallelFor( const FunctorType & arg_functor ,
+               const Policy      & arg_policy )
+    : m_instance( t_openmp_instance )
+    , m_functor( arg_functor )
+    , m_policy(  arg_policy )
+    , m_shmem_size( arg_policy.scratch_size(0) +
+                    arg_policy.scratch_size(1) +
+                    FunctorTeamShmemSize< FunctorType >
+                      ::value( arg_functor , arg_policy.team_size() ) )
+    {}
+};
+
+
 
 template< class FunctorType , class ReducerType , class ... Traits >
 class ParallelReduce< FunctorType
@@ -216,7 +342,8 @@ private:
   
   // number of threads
   const typename Policy::member_type get_policy_par_loop() const {
-	  return (m_policy_len > MAX_THREAD_COUNT ? MAX_THREAD_COUNT : m_policy_len);
+	  return (m_policy_len > Kokkos::Experimental::CilkPlus::thread_pool_size(0) ? 
+	                         Kokkos::Experimental::CilkPlus::thread_pool_size(0) : m_policy_len);
   }
   
   // internal loop per thread

@@ -74,6 +74,8 @@
    #include <Kokkos_EmuSpace.hpp>
 #endif
 
+#define MAX_THREAD_COUNT 32
+
 namespace Kokkos {
 namespace Experimental {
 /// \class CilkPlus
@@ -166,8 +168,8 @@ public:
 
   //--------------------------------------------------------------------------
 
-  inline static int thread_pool_size( int = 0 ) { return 1 ; }
-  KOKKOS_INLINE_FUNCTION static int thread_pool_rank() { return 0 ; }
+  inline static int thread_pool_size( int = 0 ) { return MAX_THREAD_COUNT; }
+  KOKKOS_INLINE_FUNCTION static int thread_pool_rank() { return NODE_ID() ; }
 
   //--------------------------------------------------------------------------
 
