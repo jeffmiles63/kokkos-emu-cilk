@@ -50,9 +50,11 @@
 #include <Kokkos_Core_fwd.hpp>
 #include <cilk/cilk.h>
 #include <memory.h>
-#include <intrinsics.h>
-#include <repl.h>
-#include <pmanip.h>
+//Replace specific Emu headers with the tools header to allow x86 compilation
+#include <emu_c_utils/emu_c_utils.h>
+//#include <intrinsics.h>
+//#include <repl.h>
+//#include <pmanip.h>
 #include <Kokkos_HostSpace.hpp>
 
 /*--------------------------------------------------------------------------*/

@@ -582,7 +582,7 @@ public:
 	if (m_apply != nullptr) {
        (*m_apply)(this, &member);
     } else {
-		printf("run apply is nullptr %d \n", mw_ptrtonodelet(this));
+		printf("run apply is nullptr %lu \n", mw_ptrtonodelet(this));
 		KOKKOS_ASSERT(0 && "run apply is nullptr")
 	}
   }

@@ -58,6 +58,8 @@
 #include <impl/Kokkos_Profiling_Interface.hpp>
 #endif
 
+#define INDEX(PTR, BLOCK, I) (PTR[I >> PRIORITY(BLOCK)][I&(BLOCK-1)])
+
 namespace Kokkos {
 namespace Experimental {
 extern void print_pointer( int i, void* ptr, const char * name );
@@ -582,6 +584,7 @@ public:
 	   size_t off = i/block_size;
 	   size_t ndx = i % block_size;
 	   KOKKOS_EXPECTS( (off) < NODELETS() );
+       //long * pRef = &INDEX(p, (block_size * size_of_type), off);
        long * pRef = (long *)mw_arrayindex((void*)p, off, NODELETS(),  block_size * size_of_type);
        //printf("Ptr::strided pointer: (%d) %d, %d, %lx \n", sizeof(element_type), i, off, pRef); fflush(stdout);       
        return (typename offset_policy::pointer)(&pRef[ndx * size_count]);
@@ -589,13 +592,17 @@ public:
 
   constexpr reference access( pointer p , ptrdiff_t i ) const noexcept
     {    
-	   size_t off = i/block_size;  
-	   size_t ndx = i % block_size;
+	   //size_t off = i/block_size;  
+	   size_t off = i>>log2(block_size);  
+	   //size_t ndx = i % block_size;
+	   size_t ndx = i & (block_size-1);
+	   
 	   if ( off >= NODELETS() ) {
 		   printf("strided red is about to fail: %d-%d-%d (%d) %d, %lx \n", size_of_type, ndx, size_count, i, off, p); 
 		   fflush(stdout);
 	   }
 	   KOKKOS_EXPECTS( off < NODELETS() );         	   
+       //long * pRef = &INDEX(p, (block_size * size_of_type), off);
        long * pRef = (long *)(mw_arrayindex((void*)p, off, NODELETS(),  block_size * size_of_type));
        //if ( size_of_type > sizeof(long) )
        //   printf("Ref::strided pointer: %d-%d-%d (%d) %d, %lx %lx\n", size_of_type, ndx, size_count, i, off, pRef, p); fflush(stdout);        
