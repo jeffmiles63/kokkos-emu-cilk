@@ -8,7 +8,9 @@
 #endif
 #include <cilk/cilk.h>
 #include <memory.h>
-#include <pmanip.h>
+//Replace specific Emu headers with the tools header to allow x86 compilation
+#include <emu_c_utils/emu_c_utils.h>
+//#include <pmanip.h>
 
 //#define KOKKOS_CILK_USE_PARALLEL_FOR
 #define MAX_THREAD_COUNT 32

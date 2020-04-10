@@ -58,15 +58,18 @@
 #include <Kokkos_EmuSpace.hpp>
 #include <impl/Kokkos_Error.hpp>
 
-#include <intrinsics.h>
+//Replace specific Emu headers with the tools header to allow x86 compilation
+#include <emu_c_utils/emu_c_utils.h>
+//#include <intrinsics.h>
 
-struct emu_pointer {
+/*struct emu_pointer {
     uint64_t view;
     uint64_t node_id;
     uint64_t nodelet_id;
     uint64_t nodelet_addr;
     uint64_t byte_offset;
 };
+*/
 
 extern "C"{
    struct emu_pointer
@@ -147,7 +150,7 @@ static long * ref_ptr = 0;
 
 static long * getRefPtr() {
    if ( ref_ptr == 0) {
-      ref_ptr = mw_malloc1dlong( NODELETS() );
+      ref_ptr = (long*)mw_malloc1dlong( NODELETS() );
    }
    return ref_ptr;
 }

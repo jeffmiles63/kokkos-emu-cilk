@@ -4,8 +4,10 @@
 
 #include <cilk/cilk.h>
 #include <cilk/reducer.h>
-#include <intrinsics.h>
-#include <pmanip.h>
+//Replace specific Emu headers with the tools header to allow x86 compilation
+#include <emu_c_utils/emu_c_utils.h>
+//#include <intrinsics.h>
+//#include <pmanip.h>
 
 namespace Kokkos {
 namespace Impl {
