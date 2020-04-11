@@ -1,6 +1,8 @@
 #define INCLUDE_CLASS
 #include <emu-test.h>
-#include <memoryweb/intrinsics.h>
+//Replace specific Emu headers with the tools header to allow x86 compilation
+#include <emu_c_utils/emu_c_utils.h>
+//#include <memoryweb/intrinsics.h>
 
 #include <time.h>
 
