@@ -1,6 +1,6 @@
 #ifndef __EMU_TEST_INTERFACE_
 #define __EMU_TEST_INTERFACE_
-#include <streamimport.h>
+//#include <streamimport.h>
 #include <string>
 #include <vector>
 #include <math.h>

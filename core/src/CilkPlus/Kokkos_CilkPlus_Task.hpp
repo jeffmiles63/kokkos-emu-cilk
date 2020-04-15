@@ -320,7 +320,7 @@ public:
       0    /* thread local buffer */
     );
 
-    long * data_ref = mw_malloc1dlong(NODELETS());
+    long * data_ref = (long*)mw_malloc1dlong(NODELETS());
 
     int offset = 0;    
     for ( int i = 0; i < NODELETS(); i++ ) {

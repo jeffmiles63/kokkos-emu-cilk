@@ -54,7 +54,9 @@
 #endif
 
 #if defined(KOKKOS_ENABLE_EMU)
-#include <memoryweb/intrinsics.h>
+//Replace specific Emu headers with the tools header to allow x86 compilation
+#include <emu_c_utils/emu_c_utils.h>
+//#include <memoryweb/intrinsics.h>
 #include <mutex>
 #include <map>
 #endif

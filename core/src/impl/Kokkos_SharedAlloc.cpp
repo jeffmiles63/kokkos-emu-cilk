@@ -44,9 +44,11 @@
 #include <Kokkos_Core.hpp>
 
 #if defined(KOKKOS_ENABLE_EMU)
-   #include <memoryweb.h>
-   #include <repl.h>
-   #include <pmanip.h>   
+//Replace specific Emu headers with the tools header to allow x86 compilation
+#include <emu_c_utils/emu_c_utils.h>
+   //#include <memoryweb.h>
+   //#include <repl.h>
+   //#include <pmanip.h>   
 #endif
 
 namespace Kokkos {
@@ -89,10 +91,10 @@ void init_locks( int i ) {
  */
 void initialize_memory_locks() {
 	int nCnt = NODELETS();
-	long * ll_ = mw_malloc1dlong(nCnt);
-	long * clp_ = mw_malloc1dlong(nCnt);
-	long * lh_ = mw_malloc1dlong(nCnt);
-	long * llock_ = mw_malloc1dlong(nCnt);
+	long * ll_ = (long*)mw_malloc1dlong(nCnt);
+	long * clp_ = (long*)mw_malloc1dlong(nCnt);
+	long * lh_ = (long*)mw_malloc1dlong(nCnt);
+	long * llock_ = (long*)mw_malloc1dlong(nCnt);
 	long ** lol_ = (long**)mw_malloc2d(nCnt, KOKKOS_MEMORY_LOCK_LEN * sizeof(AddrLock));
 	
 	mw_replicated_init( &list_lock, (long)ll_ );
@@ -126,7 +128,7 @@ bool free_lock(int i) {
 // if its in the list, it's locked...
 bool lock_addr( unsigned long ad ) {
   unsigned long addr = ad;
-  int nNode = mw_ptrtonodelet( addr );  
+  int nNode = mw_ptrtonodelet( (void*)addr );  
   bool bFound = true;
   if ( get_lock(nNode, addr) ) {	 
 	 bFound = false;
@@ -212,7 +214,7 @@ void free_node( int i, AddrLock * pWork) {
 // take it out of the list to free the lock...
 void unlock_addr( unsigned long ad ) {
   unsigned long addr = ad;
-  int nNode = mw_ptrtonodelet( addr );  
+  int nNode = mw_ptrtonodelet( (void*)addr );  
   bool bLock = get_lock(nNode, addr);  // this has to get a lock...we will wait.
   while( !bLock  )  {
 	  emu_sleep(10);

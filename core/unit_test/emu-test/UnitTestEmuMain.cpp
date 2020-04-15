@@ -45,9 +45,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <sys/time.h>
-#include <streamimport.h>
+//#include <streamimport.h>
 #include <emu-test.h>
-#include <memoryweb.h>
+//Replace specific Emu headers with the tools header to allow x86 compilation
+#include <emu_c_utils/emu_c_utils.h>
+//#include <memoryweb.h>
 
 #include <Kokkos_Core.hpp>
 

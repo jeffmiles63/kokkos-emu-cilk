@@ -335,7 +335,7 @@ public:
       const size_t alloc_size  = ( header_size +
                                  ( size_t(m_sb_count) << m_sb_size_lg2 ) ) * 
                                  Kokkos::Experimental::EmuReplicatedSpace::memory_zones();
-      m_sb_lock_array = mw_malloc1dlong(Kokkos::Experimental::EmuReplicatedSpace::memory_zones());
+      m_sb_lock_array = (long*)mw_malloc1dlong(Kokkos::Experimental::EmuReplicatedSpace::memory_zones());
       m_sb_state_array = (long**)memspace.allocate( alloc_size );
       
       //printf("%s memory pool allocated: %08x \n", memspace.name(), (unsigned long)m_sb_state_array);
@@ -671,7 +671,7 @@ public:
       ATOMIC_SWAP(&m_sb_lock_array[add_info], 0);
       
       if (p == nullptr) {
-		  printf("Cannot allocate memory pool data of size: %d \n", alloc_size);
+		  printf("Cannot allocate memory pool data of size: %lu \n", alloc_size);
 		  fflush(stdout);
 	  }
 

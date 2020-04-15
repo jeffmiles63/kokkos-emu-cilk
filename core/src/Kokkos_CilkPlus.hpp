@@ -145,7 +145,7 @@ public:
   /// method does not return until all dispatched functors on this
   /// device have completed.
   static void fence() {
-     cilk_sync;
+     //cilk_sync;
   }
 
   static void initialize( unsigned threads_count = 1 ,

@@ -64,7 +64,9 @@
 #include <impl/Kokkos_TaskTeamMember.hpp>
 #include <impl/Kokkos_EBO.hpp>
 
-#include <intrinsics.h>
+//Replace specific Emu headers with the tools header to allow x86 compilation
+#include <emu_c_utils/emu_c_utils.h>
+//#include <intrinsics.h>
 
 namespace Kokkos {
 	
