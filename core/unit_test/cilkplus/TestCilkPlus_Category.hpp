@@ -45,20 +45,23 @@
 #define KOKKOS_TEST__HPP
 
 #include <gtest/gtest.h>
-/*
-namespace Test {
 
-class CLASS_PUBLIC cilkplus : public ::testing::Test {
-public:  
-  cilkplus();
+#if defined(KOKKOS_EMU_X86)
+   namespace Test {
 
-  static void SetUpTestCase();
+      class cilkplus : public ::testing::Test {
+         public:  
+            cilkplus() { }
 
-  static void TearDownTestCase();
+            static void SetUpTestCase() {
+            }
 
-};
+            static void TearDownTestCase() {
+            }
 
-} // namespace Test*/
+      };
+   }
+#endif
 
 #define TEST_CATEGORY cilkplus
 #define TEST_EXECSPACE Kokkos::Experimental::CilkPlus

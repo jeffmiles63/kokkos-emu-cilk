@@ -43,7 +43,9 @@
 */
 
 #include<cilkplus/TestCilkPlus_Category.hpp>
-//#include<TestInit.hpp>
+#if defined(KOKKOS_EMU_X86)
+   #include<TestInit.hpp>
+#endif
 #include<TestCompilerMacros.hpp>
 #include<TestPolicyConstruction.hpp>
 
