@@ -22,12 +22,15 @@ TEST_HEADERS += $(wildcard $(KOKKOS_PATH)/core/unit_test/*/*.hpp)
 default: build_all
 	echo "End Build"
 
-ifeq (,$(findstring Emu,$(KOKKOS_DEVICES)))
+ifneq (,$(findstring Emu,$(KOKKOS_ARCH)))
   KOKKOS_ENABLE_EMU=1
 endif
 
 #Set the X86 flag explicitly to try and compile Emu code with memoryweb_x86 and gc
-KOKKOS_EMU_X86=1
+ifneq (,$(findstring EmuX86,$(KOKKOS_ARCH)))
+  KOKKOS_EMU_X86=1
+endif
+
 
 ifneq (,$(findstring Cuda,$(KOKKOS_DEVICES)))
   CXX = $(KOKKOS_PATH)/bin/nvcc_wrapper
@@ -163,19 +166,24 @@ endif
 
 ifeq ($(KOKKOS_INTERNAL_USE_CILKPLUS), 1)
    ifeq ($(KOKKOS_ENABLE_EMU), 1)
-        #JY - testing GCC compile on 2/10/20
-      OBJ_CILKPLUS = UnitTestEmuMain.o emu-test.o
-    ifeq ($(KOKKOS_EMU_X86), 0)
-      OBJ_CILKPLUS = UnitTestEmuMain.o emu-test.o streamimport.o
-    endif
+      ifeq ($(KOKKOS_EMU_X86), 1)
+        OBJ_CILKPLUS = UnitTestEmuMain.o emu-test.o
+      else
+        OBJ_CILKPLUS = UnitTestEmuMain.o emu-test.o streamimport.o
+      endif
    else
         OBJ_CILKPLUS = UnitTestMainInit.o gtest-all.o
    endif
-#        OBJ_CILKPLUS += TestCilkPlus_Init.o
-#        OBJ_CILKPLUS += TestCilkPlus_SharedAlloc.o
-    ifeq ($(KOKKOS_EMU_X86), 0)
+        OBJ_CILKPLUS += TestCilkPlus_Init.o
+        OBJ_CILKPLUS += TestCilkPlus_SharedAlloc.o
+   ifeq ($(KOKKOS_ENABLE_EMU), 1)
+      ifneq ($(KOKKOS_EMU_X86), 1)
+  	    OBJ_CILKPLUS += TestViewMemoryTraits.o
         OBJ_CILKPLUS += TestCilkPlus_RangePolicy.o
-    endif
+      endif
+   else
+      OBJ_CILKPLUS += TestCilkPlus_RangePolicy.o
+   endif
 ##        OBJ_CILKPLUS += TestCilkPlus_ViewAPI_b.o
 ##        OBJ_CILKPLUS += TestCilkPlus_ViewMapping_a.o TestCilkPlus_ViewMapping_b.o TestCilkPlus_ViewMapping_subview.o
 ##        OBJ_CILKPLUS += TestCilkPlus_ViewOfClass.o
@@ -184,16 +192,13 @@ ifeq ($(KOKKOS_INTERNAL_USE_CILKPLUS), 1)
 ##        OBJ_CILKPLUS += TestCilkPlus_SubView_c04.o TestCilkPlus_SubView_c05.o TestCilkPlus_SubView_c06.o
 ##        OBJ_CILKPLUS += TestCilkPlus_SubView_c07.o TestCilkPlus_SubView_c08.o TestCilkPlus_SubView_c09.o
 ##        OBJ_CILKPLUS += TestCilkPlus_SubView_c10.o TestCilkPlus_SubView_c11.o TestCilkPlus_SubView_c12.o
-##        OBJ_CILKPLUS += TestCilkPlus_Reductions.o
+        OBJ_CILKPLUS += TestCilkPlus_Reductions.o
 ##        OBJ_CILKPLUS +=TestCilkPlus_Scan.o
 ##        OBJ_CILKPLUS += TestCilkPlus_Complex.o
 ##        OBJ_CILKPLUS += TestCilkPlus_AtomicOperations.o
 ##        OBJ_CILKPLUS += TestCilkPlus_AtomicViews.o
 ##        OBJ_CILKPLUS += TestCilkPlus_Atomics.o
         
-    ifeq ($(KOKKOS_EMU_X86), 0)
-	OBJ_CILKPLUS += TestViewMemoryTraits.o
-    endif       
 ##        OBJ_CILKPLUS += TestCilkPlus_Team.o TestCilkPlus_TeamScratch.o
 ##        OBJ_CILKPLUS += TestCilkPlus_TeamReductionScan.o
 ##        OBJ_CILKPLUS += TestCilkPlus_Other.o

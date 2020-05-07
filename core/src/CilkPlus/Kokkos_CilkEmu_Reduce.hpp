@@ -14,9 +14,9 @@ namespace Impl {
 
 template <class ReducerType>
 ReducerType * get_reducer(const void * ptr, int refId) {
-   ReducerType * pRet = (ReducerType *)mw_arrayindex((void*)ptr, refId, 
-                      Kokkos::Experimental::EmuReplicatedSpace::memory_zones(),  sizeof(ReducerType) ); 
-   return &pRet[0];
+   void * tmp = const_cast<void*>(ptr);
+   ReducerType ** pRet = reinterpret_cast<ReducerType **>(tmp); 
+   return pRet[refId];
 }
 
 template <class ReduceWrapper, class ReducerType, class WorkTagFwd, class T = void>

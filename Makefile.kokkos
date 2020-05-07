@@ -332,6 +332,10 @@ KOKKOS_INTERNAL_USE_ARCH_POWER8 := $(call kokkos_has_string,$(KOKKOS_ARCH),Power
 KOKKOS_INTERNAL_USE_ARCH_POWER9 := $(call kokkos_has_string,$(KOKKOS_ARCH),Power9)
 KOKKOS_INTERNAL_USE_ARCH_IBM := $(strip $(shell echo $(KOKKOS_INTERNAL_USE_ARCH_BGQ)+$(KOKKOS_INTERNAL_USE_ARCH_POWER7)+$(KOKKOS_INTERNAL_USE_ARCH_POWER8)+$(KOKKOS_INTERNAL_USE_ARCH_POWER9) | bc))
 
+# Emu
+KOKKOS_INTERNAL_USE_ARCH_EMU := $(call kokkos_has_string,$(KOKKOS_ARCH),Emu)
+KOKKOS_INTERNAL_USE_ARCH_EMUX86 := $(call kokkos_has_string,$(KOKKOS_ARCH),EmuX86)
+
 # AMD based.
 KOKKOS_INTERNAL_USE_ARCH_AMDAVX := $(call kokkos_has_string,$(KOKKOS_ARCH),AMDAVX)
 KOKKOS_INTERNAL_USE_ARCH_RYZEN := $(call kokkos_has_string,$(KOKKOS_ARCH),Ryzen)
@@ -453,9 +457,13 @@ ifeq ($(KOKKOS_INTERNAL_USE_CILKPLUS), 1)
   tmp := $(call kokkos_append_header,"\#define KOKKOS_ENABLE_CILKPLUS")
 endif
 
-ifeq (,$(findstring Emu,$(KOKKOS_DEVICES)))
+ifeq ($(KOKKOS_INTERNAL_USE_ARCH_EMU), 1)
   KOKKOS_INTERNAL_USE_EMUCILK := 1
   tmp := $(call kokkos_append_header,"\#define KOKKOS_ENABLE_EMU")
+endif
+
+ifeq ($(KOKKOS_INTERNAL_USE_ARCH_EMUX86), 1)
+  tmp := $(call kokkos_append_header,"\#define KOKKOS_EMU_X86")
 endif
 
 ifeq ($(KOKKOS_INTERNAL_USE_TM), 1)

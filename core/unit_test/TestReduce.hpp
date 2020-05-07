@@ -266,7 +266,7 @@ public:
     typedef typename functor_type::value_type value_type;
 
     enum { Count = 3 };
-    enum { Repeat = 100 };
+    enum { Repeat = 1 };
 
     value_type result[ Repeat ];
 
@@ -294,7 +294,7 @@ public:
     typedef typename functor_type::value_type value_type;
 
     enum { Count = 3 };
-    enum { Repeat = 100 };
+    enum { Repeat = 1 };
 
     value_type result[ Repeat ];
 
@@ -339,7 +339,7 @@ public:
     typedef Test::RuntimeReduceFunctor< ScalarType, execution_space > functor_type;
 
     enum { Count = 3 };
-    enum { Repeat = 100 };
+    enum { Repeat = 1 };
 
     ScalarType result[ Repeat ][ Count ];
 
@@ -369,7 +369,7 @@ public:
     typedef Test::RuntimeReduceMinMax< ScalarType, execution_space > functor_type;
 
     enum { Count = 2 };
-    enum { Repeat = 100 };
+    enum { Repeat = 1 };
 
     ScalarType result[ Repeat ][ Count ];
 
@@ -404,7 +404,7 @@ public:
     typedef Test::RuntimeReduceFunctorFinal< execution_space > functor_type;
 
     enum { Count = 3 };
-    enum { Repeat = 100 };
+    enum { Repeat = 1 };
 
     typename functor_type::scalar_type result[ Repeat ][ Count ];
 
@@ -486,12 +486,14 @@ public:
 TEST_F( TEST_CATEGORY, long_reduce )
 {
   TestReduce< long, TEST_EXECSPACE >( 0 );
+  TestReduce< long, TEST_EXECSPACE >( 100 );
+  TestReduce< long, TEST_EXECSPACE >( 1000 );
   TestReduce< long, TEST_EXECSPACE >( 1000000 );
 }
 
 TEST_F( TEST_CATEGORY, double_reduce )
 {
-  TestReduce< double, TEST_EXECSPACE >( 0 );
+  TestReduce< double, TEST_EXECSPACE >( 8 );
   TestReduce< double, TEST_EXECSPACE >( 1000000 );
 }
 /*

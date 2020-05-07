@@ -194,6 +194,7 @@ private:
   typedef typename Analysis::reference_type    reference_type ;
   
   typedef typename cilk_reducer_wrapper::ReducerTypeFwd::value_type reduction_type;
+  typedef typename cilk_reducer_wrapper::local_reducer_type local_reducer_type;
   
   const FunctorType   m_functor ;
   const Policy        m_policy ;
@@ -207,7 +208,13 @@ private:
   
   const void * global_reducer = NULL;
   const void * local_reducer = NULL;
-  const void * working_ptr = NULL; 
+  const void * working_ptr = NULL;
+  pointer_type pRef[8] = {nullptr, nullptr, nullptr, nullptr, 
+	                      nullptr, nullptr, nullptr, nullptr};
+  cilk_reducer_wrapper* reducerRef[8] = {nullptr, nullptr, nullptr, nullptr, 
+	                                     nullptr, nullptr, nullptr, nullptr};
+  local_reducer_type* localRef[8] = {nullptr, nullptr, nullptr, nullptr, 
+	                                     nullptr, nullptr, nullptr, nullptr};
   
   // length of the range
   const typename Policy::member_type get_policy_len() const {
@@ -248,25 +255,26 @@ private:
   typename std::enable_if< std::is_same< TagType , void >::value >::type
   internal_reduce(const typename Policy::member_type b, const typename Policy::member_type e, 
                   int i, const size_t l_alloc_size, int nl_) const {
-	 int array_ndx = i % nl_;
-	 int reduce_off = i / nl_;
-	 //printf("[%d] reduce ndx = %d, off = %d \n", i, array_ndx, reduce_off);
-	 //fflush(stdout);
-	 cilk_reducer_wrapper* pReducer = get_reducer<cilk_reducer_wrapper>(global_reducer, array_ndx);
+	 int array_ndx = i & (nl_-1); 
+	 int reduce_off = (i>>log2(nl_));
+
+	 cilk_reducer_wrapper* pReducer = get_reducer<cilk_reducer_wrapper>(reducerRef, array_ndx);
+	 printf("[%d] reduce ndx = %d, off = %d , %lx, %lx \n", i, array_ndx, reduce_off, 
+	               (unsigned long)pRef[array_ndx], (unsigned long)pReducer);
+	 fflush(stdout);
 	 //printf("void [%d.%d] internal reduce: %lx, %d, %d, %d, %d \n", NODE_ID(), array_ndx, (unsigned long)pReducer, e, m_policy_par_size, i, m_policy_int_loop);
 	 //Kokkos::Experimental::print_pointer(i, pReducer, "reducer pointer" );
 	 
 //     printf("obtaining update pointer: %d, %d %lx \n", i, array_ndx, i_ptr);          
      //fflush(stdout);
 
-     pointer_type pRef = (pointer_type)mw_arrayindex((void*)working_ptr, array_ndx,  nl_,  l_alloc_size);
      //Kokkos::Experimental::print_pointer(i, pRef, "internal reduce (outer)" );
      //Kokkos::Experimental::print_pointer(i, &pRef[i%par_size], "internal reduce (inner)" );
 //     printf("[%d] obtaining update reference %d: %lx, offset %d\n", i, array_ndx, pRef, i%par_size);
 //     fflush(stdout);
      //reference_type lupdate = ValueInit::init(  pReducer->f , &pRef[i%par_size] );
      //pRef[i%par_size] = reduction_type();
-     reduction_type & lupdate = (reduction_type &)*(&pRef[reduce_off]);     
+     reduction_type & lupdate = (reduction_type &)*(&(pRef[array_ndx][reduce_off]));     
      //printf("[%d.%d] pointer node: %d \n", NODE_ID(), THREAD_ID(), mw_ptrtonodelet(&lupdate) );
      //Kokkos::Experimental::print_pointer(i, &lupdate, "entering inner loop" );
      
@@ -289,24 +297,23 @@ private:
                   int i, const size_t l_alloc_size, int nl_) const {
 	 const TagType t{} ;
 	 
-	 int array_ndx = i % nl_; 
-	 int reduce_off = i / nl_;
+	 int array_ndx = i & (nl_-1); 
+	 int reduce_off = (i>>log2(nl_));
 	 //printf("[%d] reduce ndx = %d, off = %d \n", i, array_ndx, reduce_off);
 	 //fflush(stdout);
 	 
-	 cilk_reducer_wrapper* pReducer = get_reducer<cilk_reducer_wrapper>(global_reducer, array_ndx);
+	 cilk_reducer_wrapper* pReducer = get_reducer<cilk_reducer_wrapper>(reducerRef, array_ndx);
 	 //printf("Tag [%d] internal reduce: %lx, %d, %d, %d \n", array_ndx, (unsigned long)pReducer, b, m_policy_par_size, i);
 	 //Kokkos::Experimental::print_pointer(i, pReducer, "reducer pointer" );
 	 //fflush(stdout);         
 //     printf("obtaining update pointer: %d, %d %lx \n", i, array_ndx, i_ptr);          
 //     fflush(stdout);
-     pointer_type pRef = (pointer_type)mw_arrayindex((void*)working_ptr, array_ndx, nl_,  l_alloc_size);
      //Kokkos::Experimental::print_pointer(i, pRef, "internal reduce (outer)" );
      //Kokkos::Experimental::print_pointer(i, &pRef[i%par_size], "internal reduce (inner)" );
      //printf("[%d] obtaining update reference %d, %d: %08x, offset %d\n", NODE_ID(), i, array_ndx, pRef, i%par_size);
      //reference_type lupdate = ValueInit::init(  pReducer->f , &pRef[i%par_size] );
      //pRef[i%par_size] = typename Analysis::value_type();
-     reduction_type & lupdate = (reduction_type & )*(&pRef[reduce_off]);     
+     reduction_type & lupdate = (reduction_type & )*(&(pRef[array_ndx][reduce_off]));     
      //printf("[%d.%d] pointer node: %d \n", NODE_ID(), THREAD_ID(), mw_ptrtonodelet(&lupdate) );
      //Kokkos::Experimental::print_pointer(i, &lupdate, "entering inner loop" );
      
@@ -320,12 +327,12 @@ private:
   }
   
   void init_reducer(const size_t l_alloc_bytes, int i) const {
-     cilk_reducer_wrapper* pH = get_reducer<cilk_reducer_wrapper>(global_reducer, i);         
-	 typename cilk_reducer_wrapper::local_reducer_type* pLocalRed = get_reducer<typename cilk_reducer_wrapper::local_reducer_type>(local_reducer, i);
+     cilk_reducer_wrapper* pH = get_reducer<cilk_reducer_wrapper>(reducerRef, i);         
+	 local_reducer_type* pLocalRed = get_reducer<local_reducer_type>(localRef, i);
 //	 printf("init reducer: %lx, %lx \n", (unsigned long)pH, (unsigned long)pLocalRed);
 //	 fflush(stdout);
-	 new (pLocalRed) NodeletReducer< typename cilk_reducer_wrapper::reduce_container >(global_reducer, i, cilk_reducer_wrapper::default_value());
-     new (pH) cilk_reducer_wrapper(global_reducer, i, ReducerConditional::select(m_functor , m_reducer), l_alloc_bytes, pLocalRed);
+	 new (pLocalRed) NodeletReducer< typename cilk_reducer_wrapper::reduce_container >(reducerRef, i, cilk_reducer_wrapper::default_value());
+     new (pH) cilk_reducer_wrapper(reducerRef, i, ReducerConditional::select(m_functor , m_reducer), l_alloc_bytes, pLocalRed);
   }
 
   void initialize_cilk_reducer(const size_t l_alloc_bytes) const
@@ -339,7 +346,6 @@ private:
          cilk_spawn_at(&refPtr[i]) init_reducer(l_alloc_bytes, i);
       }
       cilk_sync;
-      MIGRATE(&refPtr[0]);
   }
 
   template< class TagType >
@@ -369,37 +375,25 @@ private:
 		 //fflush(stdout);
          cilk_spawn_at(&refPtr[node_]) this->template internal_reduce<TagType>(b, e, i, m_reduce_size * m_policy_par_size, nl_);
       }
-      cilk_sync;
+      if (m_policy_par_loop > 0) cilk_sync;
          
-         
-      cilk_reducer_wrapper* pReducerHost = get_reducer<cilk_reducer_wrapper>(global_reducer, 0);
+      cilk_reducer_wrapper* pReducerHost = get_reducer<cilk_reducer_wrapper>(reducerRef, 0);
       for (int i = 1; i < nl_; i++) {
-		  cilk_reducer_wrapper* pReducerNode = get_reducer<cilk_reducer_wrapper>(global_reducer, i);
+		  cilk_reducer_wrapper* pReducerNode = get_reducer<cilk_reducer_wrapper>(reducerRef, i);
 		  reduction_type lRef;
 		  pReducerNode->update_value(lRef);
 		  //printf("[%d] node value: %d \n", i, lRef);
 		  pReducerHost->join(lRef);
 	  }
          
-      get_reducer<cilk_reducer_wrapper>(global_reducer, 0)->update_value(update);
-      //printf("final node value: %d \n", update);
+      get_reducer<cilk_reducer_wrapper>(reducerRef, 0)->update_value(update);
+      printf("final node value: %d \n", update);
       for (int i = 1; i < nl_; i++) {
-			 //printf("releasing resources: %d \n", i);
-			 //fflush(stdout);
-		 get_reducer<cilk_reducer_wrapper>(global_reducer, i)->release_resources();
-	  }        
-         
-         /*printf("free working pointer reducer %lx \n", w_ptr); fflush(stdout);
-         if (w_ptr != NULL) {
-            mw_free((void*)w_ptr);
-         }*/
-      //mw_free((void*)working_ptr);
-      //printf("free local reducer \n"); fflush(stdout);
-      mw_free((void*)local_reducer);
-      //printf("free global reducer \n"); fflush(stdout);
-      mw_free((void*)global_reducer);
-         
-      //printf("reduction exec complete \n"); fflush(stdout);
+         cilk_reducer_wrapper * pWrap = 
+		        get_reducer<cilk_reducer_wrapper>(reducerRef, i);
+		 pWrap->release_resources();
+         pWrap->~cilk_reducer_wrapper();
+	  }                 
   }
 
   template< class TagType >
@@ -426,25 +420,22 @@ private:
 		 cilk_spawn_at(&refPtr[node_]) this->template internal_reduce<TagType>(b, e, i, m_reduce_size*m_policy_par_size, nl_);
 	  }
 	  cilk_sync;
-	  cilk_reducer_wrapper* pReducerHost = get_reducer<cilk_reducer_wrapper>(global_reducer, 0);
+	  cilk_reducer_wrapper* pReducerHost = get_reducer<cilk_reducer_wrapper>(reducerRef, 0);
 	  for (int i = 1; i < nl_; i++) {
-	 	 cilk_reducer_wrapper* pReducerNode = get_reducer<cilk_reducer_wrapper>(global_reducer, i);
+	 	 cilk_reducer_wrapper* pReducerNode = get_reducer<cilk_reducer_wrapper>(reducerRef, i);
 		 reduction_type lRef;
 		 pReducerNode->update_value(lRef);
 		 pReducerHost->join(lRef);
 	  }
-	 
-	  get_reducer<cilk_reducer_wrapper>(global_reducer, 0)->update_value(update);
-	 
-	  for (int i = 1; i < Kokkos::Experimental::EmuReplicatedSpace::memory_zones(); i++) {
-//			 printf("releasing resources: %d \n", i);
-//			 fflush(stdout);
-		 get_reducer<cilk_reducer_wrapper>(global_reducer, i)->release_resources();
- 	  }        
-	 
-	  //mw_free((void*)working_ptr);
-	  mw_free((void*)local_reducer);
-	  mw_free((void*)global_reducer);
+	 	 
+      get_reducer<cilk_reducer_wrapper>(reducerRef, 0)->update_value(update);
+      printf("final node value: %d \n", update);
+      for (int i = 1; i < nl_; i++) {
+         cilk_reducer_wrapper * pWrap = 
+		        get_reducer<cilk_reducer_wrapper>(reducerRef, i);
+		 pWrap->release_resources();
+         pWrap->~cilk_reducer_wrapper();
+	  }        
 	   
    }
 
@@ -515,7 +506,7 @@ public:
                                    ) 
                      )  
     , local_reducer ( mw_malloc2d(Kokkos::Experimental::EmuReplicatedSpace::memory_zones(), 
-                                  sizeof(typename cilk_reducer_wrapper::local_reducer_type)
+                                  sizeof(local_reducer_type)
                                   )
                     ) 
     , working_ptr ( mw_malloc2d(Kokkos::Experimental::EmuReplicatedSpace::memory_zones(), 
@@ -523,11 +514,21 @@ public:
                                 )
                   ) 
     {
+      printf("Working ptr: %lx \n", (unsigned long)working_ptr);
+      fflush(stdout);
       static_assert( Kokkos::is_view< HostViewType >::value
         , "Kokkos::Experimental::CilkPlus reduce result must be a View" );
 
       static_assert( std::is_same< typename HostViewType::memory_space , HostSpace >::value
         , "Kokkos::Experimental::CilkPlus reduce result must be a View in HostSpace" );
+      for (int i = 0; i < Kokkos::Experimental::EmuReplicatedSpace::memory_zones(); i++) {
+	     pRef[i] = (pointer_type)mw_arrayindex((void*)working_ptr, i, Kokkos::Experimental::EmuReplicatedSpace::memory_zones(),  
+		                                m_policy_par_size * m_reduce_size);
+         reducerRef[i] = (cilk_reducer_wrapper*)mw_arrayindex((void*)global_reducer, i, Kokkos::Experimental::EmuReplicatedSpace::memory_zones(),  
+		                                       sizeof(cilk_reducer_wrapper));
+	     localRef[i] = (local_reducer_type*)mw_arrayindex((void*)local_reducer, i, Kokkos::Experimental::EmuReplicatedSpace::memory_zones(),  
+		                                       sizeof(cilk_reducer_wrapper));
+      }
     }
   inline
   ParallelReduce( const FunctorType & arg_functor
@@ -543,10 +544,29 @@ public:
     , m_result_ptr(  reducer.view().data() )
     , m_reduce_size( get_reduce_size( m_functor, m_reducer ) )
     , global_reducer ( mw_malloc2d(Kokkos::Experimental::EmuReplicatedSpace::memory_zones(), sizeof(cilk_reducer_wrapper)) )  // one for each memory zone...
-    , local_reducer ( mw_malloc2d(Kokkos::Experimental::EmuReplicatedSpace::memory_zones(), sizeof(typename cilk_reducer_wrapper::local_reducer_type)))     
+    , local_reducer ( mw_malloc2d(Kokkos::Experimental::EmuReplicatedSpace::memory_zones(), sizeof(local_reducer_type)))     
     , working_ptr ( mw_malloc2d(Kokkos::Experimental::EmuReplicatedSpace::memory_zones(), m_policy_par_size * m_reduce_size )) 
     {
+      printf("Working ptr: %lx \n", (unsigned long)working_ptr);
+      fflush(stdout);
+		for (int i = 0; i < Kokkos::Experimental::EmuReplicatedSpace::memory_zones(); i++) {
+		   pRef[i] = (pointer_type)mw_arrayindex((void*)working_ptr, i, Kokkos::Experimental::EmuReplicatedSpace::memory_zones(),  
+		                                m_policy_par_size * m_reduce_size);
+		   reducerRef[i] = (cilk_reducer_wrapper*)mw_arrayindex((void*)global_reducer, i, Kokkos::Experimental::EmuReplicatedSpace::memory_zones(),  
+		                                       sizeof(cilk_reducer_wrapper));
+		   localRef[i] = (local_reducer_type*)mw_arrayindex((void*)local_reducer, i, Kokkos::Experimental::EmuReplicatedSpace::memory_zones(),  
+		                                       sizeof(cilk_reducer_wrapper));
+        }
     }
+    
+    inline
+    ~ParallelReduce() {
+      printf("at dest ... Working ptr: %lx \n", (unsigned long)working_ptr);
+      fflush(stdout);
+      mw_free((void*)global_reducer);
+      mw_free((void*)local_reducer);
+      mw_free((void*)working_ptr);
+	}
 };
 }
 }
