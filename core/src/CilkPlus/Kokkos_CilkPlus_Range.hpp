@@ -428,7 +428,7 @@ public:
     , m_result_ptr( arg_result_view.data() )
     , m_reduce_size( get_reduce_size( m_functor, m_reducer ) )
     , global_reducer ( mw_malloc2d(Kokkos::Experimental::EmuReplicatedSpace::memory_zones(), // one for each memory zone...
-                                   2 * sizeof(cilk_reducer_wrapper)
+                                   sizeof(cilk_reducer_wrapper)
                                    ) 
                      )  
     , local_reducer ( mw_malloc2d(Kokkos::Experimental::EmuReplicatedSpace::memory_zones(), 
