@@ -71,8 +71,8 @@ public:
      ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {
-        while (true) {		 
-//        printf("reducer view join (B): %ld, %ld \n", val, right);
+        while (true) {
+           //printf("reducer view join (B): %ld, %ld \n", val, right);
            if (Impl::lock_addr((unsigned long)&val)) {
 			   ValueJoin::join( ptr->r, &val, &right );
                Impl::unlock_addr((unsigned long)&val);
@@ -137,7 +137,7 @@ struct CilkReduceContainer<ReduceWrapper, ReducerType, WorkTagFwd, typename std:
      ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {
-        //printf("[%d] reducer reduce: %ld, %ld \n", id, *left, *right);
+       // printf("140 [%d] reducer reduce: %ld, %ld \n", id, *left, *right);
         ValueJoin::join( ptr->r, left, right );
      }
   }
@@ -266,10 +266,10 @@ struct CilkReduceContainer<ReduceWrapper, ReducerType, WorkTagFwd, typename std:
   inline
   void reduce( const void * rp, int id, rd_value_type * left, rd_value_type const * right )
   {
-	 printf("Reduce container reduce: %d \n", id);
-	 fflush(stdout);
+	 //printf("Reduce container reduce: %d \n", id);
+	 //fflush(stdout);
 	  
-     //printf("array reduce : %ld, %ld, %08x %08x \n", left[0], right[0], left, right);
+     //printf("272 :array reduce : %ld, %ld, %08x %08x \n", left[0], right[0], left, right);
      ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {
@@ -386,7 +386,7 @@ struct CilkReduceContainer<ReduceWrapper, ReducerType, WorkTagFwd, typename std:
 	 //printf("Reduce container reduce: %d \n", id);
 	 //fflush(stdout);
 
-     //printf("reducer - reduce (S): %ld, %ld [%d] \n", (*left).value[0], (*right).value[0], id);
+     //printf("389 reducer - reduce (S): %ld, %ld [%d] \n", (*left).value[0], (*right).value[0], id);
      ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {
@@ -534,7 +534,8 @@ struct kokkos_cilk_reducer< ReducerType, Functor, defaultType, WorkTagFwd , type
                                                                            alloc_bytes(l_alloc_bytes),
                                                                            local_reducer(reinterpret_cast<local_reducer_type *>(ptr_reducer)), 
                                                                            global_reducer(gr_) {
-        //printf("constructing default scalar reducer (sum), size = %d , addr = %08x\n", (int)l_alloc_bytes, (unsigned long)this );        
+       // printf("constructing default scalar reducer (sum), size = %d , addr = %08x\n", (int)l_alloc_bytes, (unsigned long)this );        
+       // fflush(stdout);
         ValueInit::init( r, &local_value );
         //defaultType test_val;
         //update_value(test_val);
