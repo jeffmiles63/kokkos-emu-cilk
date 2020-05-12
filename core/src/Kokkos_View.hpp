@@ -564,6 +564,9 @@ public:
   using reference     = ElementType&;
   
   size_t block_size;
+  mutable long * pRef[8] = {nullptr, nullptr, nullptr, nullptr,
+	                        nullptr, nullptr, nullptr, nullptr};
+
   static const size_t size_of_type = sizeof( element_type) + 
                               ( ((sizeof( element_type ) % sizeof(long)) == 0) ? 
                               0 : (sizeof(long) - (sizeof( element_type ) % sizeof(long))) );
@@ -572,42 +575,40 @@ public:
   accessor_strided( const accessor_strided & rhs) = default;
   accessor_strided & operator = ( const accessor_strided & rhs) = default;
   accessor_strided( ) : block_size(1) {
-	      //printf("default strided accessor block = %d \n", block_size); fflush(stdout);
+	      printf("default strided accessor block = %d \n", block_size); fflush(stdout);
 	  }
   accessor_strided( const size_t b_ ) : block_size(b_) {
-	    //printf("strided accessor block = %d \n", block_size); fflush(stdout);
+	    printf("strided accessor block = %d \n", block_size); fflush(stdout);
 	}
 
   constexpr typename offset_policy::pointer
     offset( pointer p , ptrdiff_t i ) const noexcept
     {  
-	   size_t off = i/block_size;
-	   size_t ndx = i % block_size;
+	   size_t ndx = i & (block_size-1);
+	   size_t off = (i>>log2(block_size));  
 	   KOKKOS_EXPECTS( (off) < NODELETS() );
-       //long * pRef = &INDEX(p, (block_size * size_of_type), off);
-       long * pRef = (long *)mw_arrayindex((void*)p, off, NODELETS(),  block_size * size_of_type);
-       //printf("Ptr::strided pointer: (%d) %d, %d, %lx \n", sizeof(element_type), i, off, pRef); fflush(stdout);       
-       return (typename offset_policy::pointer)(&pRef[ndx * size_count]);
+	   if ( pRef[off] == nullptr ) {
+	      pRef[off] = (long *)mw_arrayindex((void*)p, off, NODELETS(),  block_size * size_of_type);
+	   }    
+	   //printf("Ptr::strided pointer: (%d) %d, %d, %lx \n", sizeof(element_type), i, off, pRef); fflush(stdout);       
+       return (typename offset_policy::pointer)(&(pRef[off][ndx * size_count]));
 	}
 
   constexpr reference access( pointer p , ptrdiff_t i ) const noexcept
     {    
-	   //size_t off = i/block_size;  
-	   size_t off = i>>log2(block_size);  
-	   //size_t ndx = i % block_size;
 	   size_t ndx = i & (block_size-1);
-	   
-	   if ( off >= NODELETS() ) {
-		   printf("strided red is about to fail: %d-%d-%d (%d) %d, %lx \n", size_of_type, ndx, size_count, i, off, p); 
-		   fflush(stdout);
-	   }
-	   KOKKOS_EXPECTS( off < NODELETS() );         	   
-       //long * pRef = &INDEX(p, (block_size * size_of_type), off);
-       long * pRef = (long *)(mw_arrayindex((void*)p, off, NODELETS(),  block_size * size_of_type));
-       //if ( size_of_type > sizeof(long) )
+	   size_t off = (i>>log2(block_size));
+	   if (off >= NODELETS())
+	      printf("Ref::strided pointer offset out of bounds: %d, %d, %d \n", i, off, block_size);  
+	   KOKKOS_EXPECTS( (off) < NODELETS() );   
+	   if ( pRef[off] == nullptr ) {
+          pRef[off] = (long *)(mw_arrayindex((void*)p, off, NODELETS(),  block_size * size_of_type));
+	   }   
+	   //if ( size_of_type > sizeof(long) )
        //   printf("Ref::strided pointer: %d-%d-%d (%d) %d, %lx %lx\n", size_of_type, ndx, size_count, i, off, pRef, p); fflush(stdout);        
           
-       return *((pointer)(&pRef[ndx*size_count]));
+       return *((pointer)(&(pRef[off][ndx*size_count])));
+
 	}
 
   constexpr ElementType* decay( pointer p ) const noexcept

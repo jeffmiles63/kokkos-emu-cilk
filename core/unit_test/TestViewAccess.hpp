@@ -154,7 +154,7 @@ void TestViewAccess( int N ) {
    printf("local memory view test complete\n");
 
 */
-
+/*
    {
       Kokkos::View< Scalar*, Kokkos::Experimental::EmuReplicatedSpace > replicated_space_view( "replicated", N );   
       printf ("replicated view size is %ld \n", (unsigned long)sizeof(replicated_space_view));
@@ -170,7 +170,7 @@ void TestViewAccess( int N ) {
 		 }
       });
    } 
-   
+  */ 
    
    Kokkos::fence();
    {
