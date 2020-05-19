@@ -48,6 +48,10 @@
 
 #include <Kokkos_Core.hpp>
 
+#ifdef KOKKOS_ENABLE_EMU
+#include <emu_c_utils/hooks.h>
+#endif
+
 namespace Test {
 
 template< typename ScalarType, class DeviceType >
@@ -486,7 +490,13 @@ public:
 TEST_F( TEST_CATEGORY, long_reduce )
 {
   TestReduce< long, TEST_EXECSPACE >( 0 );
+//#ifdef KOKKOS_ENABLE_EMU
+//  hooks_region_begin("long_reduce");
+//#endif
   TestReduce< long, TEST_EXECSPACE >( 100 );
+//#ifdef KOKKOS_ENABLE_EMU
+//  hooks_region_end();
+//#endif
   TestReduce< long, TEST_EXECSPACE >( 1000 );
   TestReduce< long, TEST_EXECSPACE >( 100000 );
 }
@@ -494,6 +504,7 @@ TEST_F( TEST_CATEGORY, long_reduce )
 TEST_F( TEST_CATEGORY, double_reduce )
 {
   TestReduce< double, TEST_EXECSPACE >( 8 );
+  TestReduce< double, TEST_EXECSPACE >( 50 );
   TestReduce< double, TEST_EXECSPACE >( 100000 );
 }
 /*

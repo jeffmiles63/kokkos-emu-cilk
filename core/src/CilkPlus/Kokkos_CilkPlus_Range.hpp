@@ -193,12 +193,15 @@ private:
   
   const void * global_reducer = NULL;
   const void * local_reducer = NULL;
+  const void * interim_reducer = NULL;
 //  const void * working_ptr = NULL;
 //  pointer_type pRef[8] = {nullptr, nullptr, nullptr, nullptr, 
 //	                      nullptr, nullptr, nullptr, nullptr};
   cilk_reducer_wrapper* reducerRef[8] = {nullptr, nullptr, nullptr, nullptr, 
 	                                     nullptr, nullptr, nullptr, nullptr};
   local_reducer_type* localRef[8] = {nullptr, nullptr, nullptr, nullptr, 
+	                                     nullptr, nullptr, nullptr, nullptr};
+  nodelet_reducer_type * interimRef[8] = {nullptr, nullptr, nullptr, nullptr, 
 	                                     nullptr, nullptr, nullptr, nullptr};
   
   // length of the range
@@ -234,63 +237,127 @@ private:
         return Analysis::value_size( ReducerConditional::select(func_ , red_) );
   }
 
-
   template< class TagType >
   inline
   typename std::enable_if< std::is_same< TagType , void >::value >::type
-  internal_reduce(const typename Policy::member_type b, const typename Policy::member_type e, 
-                  int i, const size_t l_alloc_size, int nl_) const {
-	 int array_ndx = i & (nl_-1); 
-	 //int reduce_off = (i>>log2(nl_));
+  internal_reduce(const typename Policy::member_type start, int sc_, int iLoop, int nl_, 
+                  typename cilk_reducer_wrapper::reduce_container::ViewType * up_view) const {
+	 
+	 // Spawn threads under each nodelet... sc_ == 0 implies bottom of the tree
+     if ( sc_ > 1 ) {
+         // create a reducer view here and pass it down, then each thread will add result to this view.
+         nodelet_reducer_type* interimReduce = get_reducer<nodelet_reducer_type>(interimRef, iLoop);
+         typename cilk_reducer_wrapper::reduce_container::ViewType * upView = interimReduce->view();
 
-	 cilk_reducer_wrapper* pReducer = get_reducer<cilk_reducer_wrapper>(reducerRef, array_ndx);
+	     for (int s = 0; s < sc_; s++) {
+			 //printf("thread spawning %d, %d \n", iLoop, iLoop * sc_ + s);
+		     _Cilk_spawn internal_reduce<TagType>(start, 0, iLoop * sc_ + s, nl_, upView );
+         }
+         cilk_sync;
+         // get the results from each of the sub threads and then add it to the one for this node.
+         reduction_type lupdate = interimReduce->get_value();
+         //printf("thread adding to global: %d %g \n", iLoop, lupdate);
+	     cilk_reducer_wrapper* pReducer = get_reducer<cilk_reducer_wrapper>(reducerRef, iLoop);
+	     pReducer->join(lupdate);
+     } else {
+		 // iLoop is the "thread id", array_ndx extracts out the nodelet.
+	     int array_ndx = iLoop & (nl_-1);
+	     //printf("worker thread: %d, %d \n", iLoop, array_ndx); 
+         int offset = iLoop * m_policy_int_loop;
+         cilk_reducer_wrapper* pReducer = get_reducer<cilk_reducer_wrapper>(reducerRef, array_ndx);
+	     
+         // working variable.
+         reduction_type lupdate;
+         
+         // local reducer for int loop
+         nodelet_reducer_type localReduce(reducerRef, array_ndx, cilk_reducer_wrapper::default_value(), false);
+         typename cilk_reducer_wrapper::reduce_container::ViewType * cont = localReduce.view();
+
+         for ( int j = 0; j < m_policy_int_loop; j++) {
+		     int ndx = start + offset + j;
+		     if ( ndx < m_policy.end() )  {
+  	           cont->identity(reducerRef, array_ndx, &lupdate);
+               pReducer->f( (const typename Policy::member_type)ndx , lupdate );
+               cont->join( reducerRef, array_ndx, lupdate );
+		     }
+		 }
+		 reduction_type localUpd = localReduce.get_value();
+	     if ( up_view != nullptr ) {
+			 //printf("thread adding to upstream: %d %g \n", iLoop, localUpd);
+			 up_view->join( reducerRef, array_ndx, localUpd );
+		 } else {
+            //printf("thread adding to global: %d %g \n", iLoop, localUpd);
+	        cilk_reducer_wrapper* pReducer = get_reducer<cilk_reducer_wrapper>(reducerRef, iLoop);
+	        pReducer->join(localUpd);
+		 }
+	 }
 //	 printf("[%d] reduce ndx = %d, off = %d , %lx, %lx \n", i, array_ndx, reduce_off, 
 //	               (unsigned long)pRef[array_ndx], (unsigned long)pReducer);
-     int start = (b + (m_policy_int_loop * i));
-     int end = start + m_policy_int_loop;
 	 //printf("[%d] reduce ndx = %d, %lx, %d - %d\n", i, array_ndx, (unsigned long)pReducer, start, end);
 	 //fflush(stdout);
-     //reduction_type & lupdate = (reduction_type &)*(&(pRef[array_ndx][reduce_off]));     
-     reduction_type lupdate;
-     nodelet_reducer_type localReduce(reducerRef, array_ndx, cilk_reducer_wrapper::default_value());
-     typename cilk_reducer_wrapper::reduce_container::ViewType * cont = localReduce.view();
-     
-     for ( typename Policy::member_type j = start; j < end; j++ ) {
-        if (j < e) {
-		   cont->identity(reducerRef, array_ndx, &lupdate);
-           pReducer->f( (const typename Policy::member_type)j , lupdate );
-           cont->join( reducerRef, array_ndx, lupdate );
-        }
-     }
-     lupdate = localReduce.get_value();
-     pReducer->join(lupdate);
+     //reduction_type & lupdate = (reduction_type &)*(&(pRef[array_ndx][reduce_off]));          
   }
   
 
   template< class TagType >
   inline
   typename std::enable_if< ! std::is_same< TagType , void >::value >::type
-  internal_reduce(const typename Policy::member_type b, const typename Policy::member_type e, 
-                  int i, const size_t l_alloc_size, int nl_) const {
-	 const TagType t{} ;
-	 int array_ndx = i & (nl_-1); 
-	 //int reduce_off = (i>>log2(nl_)); 
-	 cilk_reducer_wrapper* pReducer = get_reducer<cilk_reducer_wrapper>(reducerRef, array_ndx);
-     //reduction_type & lupdate = (reduction_type & )*(&(pRef[array_ndx][reduce_off]));     
-     reduction_type lupdate;
-     
-     for ( typename Policy::member_type j = (b+(m_policy_int_loop * i)); j < (b+( (m_policy_int_loop * i) + m_policy_int_loop)); j++ ) {
-        if (j < e) {
-		   pReducer->init(lupdate);	   
-           pReducer->f( t, (const typename Policy::member_type)j , lupdate );
-           pReducer->join( lupdate );
-        }
-     }
+  internal_reduce(const typename Policy::member_type start, int sc_, int iLoop, int nl_, 
+                  typename cilk_reducer_wrapper::reduce_container::ViewType * up_view) const {
+	 const TagType t{};
+	 
+	 // Spawn threads under each nodelet... sc_ == 0 implies bottom of the tree
+     if ( sc_ > 1 ) {
+         // create a reducer view here and pass it down, then each thread will add result to this view.
+         nodelet_reducer_type* interimReduce = get_reducer<nodelet_reducer_type>(interimRef, iLoop);
+	     typename cilk_reducer_wrapper::reduce_container::ViewType * upView = interimReduce->view();
+
+	     for (int s = 0; s < sc_; s++) {
+		     _Cilk_spawn internal_reduce<TagType>(start, 0, iLoop * sc_ + s, nl_, upView );
+         }
+         cilk_sync;
+         // get the results from each of the sub threads and then add it to the one for this node.
+         reduction_type lupdate = interimReduce->get_value();
+         cilk_reducer_wrapper* pReducer = get_reducer<cilk_reducer_wrapper>(reducerRef, iLoop);
+	     pReducer->join(lupdate);
+     } else {
+		 // iLoop is the "thread id", array_ndx extracts out the nodelet.
+	     int array_ndx = iLoop & (nl_-1); 
+         int offset = iLoop * m_policy_int_loop;
+         cilk_reducer_wrapper* pReducer = get_reducer<cilk_reducer_wrapper>(reducerRef, array_ndx);
+	     
+         // working variable.
+         reduction_type lupdate;
+         
+         // local reducer for int loop
+         nodelet_reducer_type localReduce(reducerRef, array_ndx, cilk_reducer_wrapper::default_value(), false);
+         typename cilk_reducer_wrapper::reduce_container::ViewType * cont = localReduce.view();
+
+         for ( int j = 0; j < m_policy_int_loop; j++) {
+		     int ndx = start + offset + j;
+		     if ( ndx < m_policy.end() )  {
+  	           cont->identity(reducerRef, array_ndx, &lupdate);
+               pReducer->f( t, (const typename Policy::member_type)ndx , lupdate );
+               cont->join( reducerRef, array_ndx, lupdate );
+		     }
+		 }
+		 reduction_type localUpd = localReduce.get_value();
+	     if ( up_view != nullptr ) {
+			 //printf("thread adding to upstream: %d %g \n", iLoop, localUpd);
+			 up_view->join( reducerRef, array_ndx, localUpd );
+		 } else {
+            //printf("thread adding to global: %d %g \n", iLoop, localUpd);
+	        cilk_reducer_wrapper* pReducer = get_reducer<cilk_reducer_wrapper>(reducerRef, iLoop);
+	        pReducer->join(localUpd);
+		 }
+	 }
   }
   
   void init_reducer(const size_t l_alloc_bytes, int i) const {
      cilk_reducer_wrapper* pH = get_reducer<cilk_reducer_wrapper>(reducerRef, i);         
 	 local_reducer_type* pLocalRed = get_reducer<local_reducer_type>(localRef, i);
+	 nodelet_reducer_type* interimReduce = get_reducer<nodelet_reducer_type>(interimRef, i);
+	 new (interimReduce) nodelet_reducer_type(reducerRef, i, cilk_reducer_wrapper::default_value());
 	 new (pLocalRed) nodelet_reducer_type(reducerRef, i, cilk_reducer_wrapper::default_value());
      new (pH) cilk_reducer_wrapper(reducerRef, i, ReducerConditional::select(m_functor , m_reducer), l_alloc_bytes, pLocalRed);
   }
@@ -311,15 +378,14 @@ private:
     {      
 	  int nl_ = Kokkos::Experimental::EmuReplicatedSpace::memory_zones();
       
-      const typename Policy::member_type e = m_policy.end();
-      const typename Policy::member_type b = m_policy.begin();         
-               
-      for (int i = 0; i < m_policy_par_loop; i++) {
- 	     //int node_ = i % nl_;
-         _Cilk_spawn this->template internal_reduce<TagType>(b, e, i, m_reduce_size * m_policy_par_size, nl_);
-      }
-      if (m_policy_par_loop > 0) cilk_sync;
-         
+      const typename Policy::member_type b = m_policy.begin();
+      
+      if (m_policy_par_loop > 0) {         
+         for (int i = 0; i < nl_; i++) {
+            _Cilk_spawn this->template internal_reduce<TagType>(b, m_policy_par_size, i, nl_, nullptr);
+         }
+         cilk_sync;
+	  }
       cilk_reducer_wrapper* pReducerHost = get_reducer<cilk_reducer_wrapper>(reducerRef, 0);
       for (int i = 1; i < nl_; i++) {
 		  cilk_reducer_wrapper* pReducerNode = get_reducer<cilk_reducer_wrapper>(reducerRef, i);
@@ -345,14 +411,14 @@ private:
   {      
 	  int nl_ = Kokkos::Experimental::EmuReplicatedSpace::memory_zones();
       
-      const typename Policy::member_type e = m_policy.end();
       const typename Policy::member_type b = m_policy.begin();
 
-	  for (int i = 0; i < m_policy_par_loop; i++) {
-		 //int node_ = i % nl_;
-		 _Cilk_spawn this->template internal_reduce<TagType>(b, e, i, m_reduce_size*m_policy_par_size, nl_);
+      if (m_policy_par_loop > 0) {         
+         for (int i = 0; i < nl_; i++) {
+            _Cilk_spawn this->template internal_reduce<TagType>(b, m_policy_par_size, i, nl_, nullptr);
+         }
+         cilk_sync;
 	  }
-	  cilk_sync;
 	  cilk_reducer_wrapper* pReducerHost = get_reducer<cilk_reducer_wrapper>(reducerRef, 0);
 	  for (int i = 1; i < nl_; i++) {
 	 	 cilk_reducer_wrapper* pReducerNode = get_reducer<cilk_reducer_wrapper>(reducerRef, i);
@@ -435,6 +501,10 @@ public:
                                   sizeof(nodelet_reducer_type)
                                   )
                     ) 
+    , interim_reducer ( mw_malloc2d(Kokkos::Experimental::EmuReplicatedSpace::memory_zones(), 
+                                  sizeof(nodelet_reducer_type)
+                                  )
+                    )
  //   , working_ptr ( mw_malloc2d(Kokkos::Experimental::EmuReplicatedSpace::memory_zones(), 
  //                               m_policy_par_size * m_reduce_size
  //                               )
@@ -454,6 +524,8 @@ public:
 		                                       sizeof(cilk_reducer_wrapper));
 	     localRef[i] = (local_reducer_type*)mw_arrayindex((void*)local_reducer, i, Kokkos::Experimental::EmuReplicatedSpace::memory_zones(),  
 		                                       sizeof(nodelet_reducer_type));
+         interimRef[i] = (nodelet_reducer_type*)mw_arrayindex((void*)interim_reducer, i, Kokkos::Experimental::EmuReplicatedSpace::memory_zones(),  
+		                                       sizeof(nodelet_reducer_type));
       }
     }
   inline
@@ -471,6 +543,7 @@ public:
     , m_reduce_size( get_reduce_size( m_functor, m_reducer ) )
     , global_reducer ( mw_malloc2d(Kokkos::Experimental::EmuReplicatedSpace::memory_zones(), sizeof(cilk_reducer_wrapper)) )  // one for each memory zone...
     , local_reducer ( mw_malloc2d(Kokkos::Experimental::EmuReplicatedSpace::memory_zones(), sizeof(nodelet_reducer_type)))     
+    , interim_reducer ( mw_malloc2d(Kokkos::Experimental::EmuReplicatedSpace::memory_zones(), sizeof(nodelet_reducer_type)))
 //    , working_ptr ( mw_malloc2d(Kokkos::Experimental::EmuReplicatedSpace::memory_zones(), m_policy_par_size * m_reduce_size )) 
     {
 //      printf("Working ptr: %lx \n", (unsigned long)working_ptr);
@@ -481,6 +554,8 @@ public:
 		   reducerRef[i] = (cilk_reducer_wrapper*)mw_arrayindex((void*)global_reducer, i, Kokkos::Experimental::EmuReplicatedSpace::memory_zones(),  
 		                                       sizeof(cilk_reducer_wrapper));
 		   localRef[i] = (local_reducer_type*)mw_arrayindex((void*)local_reducer, i, Kokkos::Experimental::EmuReplicatedSpace::memory_zones(),  
+		                                       sizeof(nodelet_reducer_type));
+           interimRef[i] = (nodelet_reducer_type*)mw_arrayindex((void*)interim_reducer, i, Kokkos::Experimental::EmuReplicatedSpace::memory_zones(),  
 		                                       sizeof(nodelet_reducer_type));
         }
     }

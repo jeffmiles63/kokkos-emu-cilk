@@ -37,11 +37,15 @@ struct CilkEmuReduceView<ReduceWrapper, ReducerType, WorkTagFwd, typename std::e
   typedef Kokkos::Impl::FunctorValueInit< ReducerType, WorkTagFwd >   ValueInit;
 
   rd_value_type & val;
+  bool enable_atomic = true;
 
 
 public:
   inline
-  CilkEmuReduceView( const void * rp, int id, rd_value_type & val_ ) : val(val_) {
+  CilkEmuReduceView( const void * rp, int id, rd_value_type & val_, bool atomic_ = true ) : 
+                 val(val_),
+                 enable_atomic(atomic_)               
+                 {
   }
 
   inline
@@ -51,13 +55,17 @@ public:
      //fflush(stdout);
      if (ptr)
      {
-        while (true) {
-           if (Impl::lock_addr((unsigned long)val)) {
-			   ValueInit::init( ptr->r, val );           
-               Impl::unlock_addr((unsigned long)val);
-               break;
+		 if (enable_atomic) {
+            while (true) {
+               if (Impl::lock_addr((unsigned long)val)) {
+			       ValueInit::init( ptr->r, val );           
+                   Impl::unlock_addr((unsigned long)val);
+                   break;
+               }
+               Kokkos::Impl::emu_sleep((unsigned long)val);
             }
-            Kokkos::Impl::emu_sleep((unsigned long)val);
+		} else {
+	        ValueInit::init( ptr->r, val );           
         }		         
      }  
      //printf("after internal identity reduction value: %d, %lx, %d \n", id, ptr, *val);
@@ -71,14 +79,18 @@ public:
      ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {
-        while (true) {
-           //printf("reducer view join (B): %ld, %ld \n", val, right);
-           if (Impl::lock_addr((unsigned long)&val)) {
-			   ValueJoin::join( ptr->r, &val, &right );
-               Impl::unlock_addr((unsigned long)&val);
-               break;
+		 if (enable_atomic) {
+            while (true) {
+              //printf("reducer view join (B): %ld, %ld \n", val, right);
+              if (Impl::lock_addr((unsigned long)&val)) {
+			      ValueJoin::join( ptr->r, &val, &right );
+                  Impl::unlock_addr((unsigned long)&val);
+                  break;
+               }
+               Kokkos::Impl::emu_sleep((unsigned long)&val);
             }
-            Kokkos::Impl::emu_sleep((unsigned long)&val);
+		} else {
+	       ValueJoin::join( ptr->r, &val, &right );
         }
 //        printf("reducer view join (A): %ld, %ld \n", val, right);
      }
@@ -159,12 +171,14 @@ struct CilkEmuReduceView<ReduceWrapper, ReducerType, WorkTagFwd, typename std::e
   typedef Kokkos::Impl::FunctorValueInit< ReducerType, WorkTagFwd >   ValueInit;
 
   rd_value_type * val;
+  bool enable_atomic = true;
 
 public:
   // need to allocate space for val as it is just a pointer, then 
   // copy *val_ 
   inline
-  CilkEmuReduceView( const void * rp, int id, rd_value_type * val_ ) {
+  CilkEmuReduceView( const void * rp, int id, rd_value_type * val_, bool atomic_ = true ) {
+	 enable_atomic = atomic_;
      //printf("array view constructor: %08x \n", val_);
      ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
@@ -293,10 +307,11 @@ struct CilkEmuReduceView<ReduceWrapper, ReducerType, WorkTagFwd, typename std::e
   typedef Kokkos::Impl::FunctorValueInit< ReducerType, WorkTagFwd >  ValueInit;
 
   rd_value_type & val;
+  bool enable_atomic = true;
 
 public:
   inline
-  CilkEmuReduceView( const void * rp, int id, rd_value_type & val_ ) : val(val_) {
+  CilkEmuReduceView( const void * rp, int id, rd_value_type & val_, bool atomic_ = true) : val(val_), enable_atomic(atomic_) {
 	  //printf("[%d] init reducer view: %lx \n", id, &val);
   }
 
@@ -306,14 +321,18 @@ public:
      ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {
-        while (true) {
-           if (Impl::lock_addr((unsigned long)val)) {
-			   ValueInit::init( ptr->r, val );
-               Impl::unlock_addr((unsigned long)val);
-               break;
-            }
-            Kokkos::Impl::emu_sleep((unsigned long)val);
-        }			         
+		if (enable_atomic) {
+           while (true) {
+              if (Impl::lock_addr((unsigned long)val)) {
+		   	      ValueInit::init( ptr->r, val );
+                  Impl::unlock_addr((unsigned long)val);
+                  break;
+               }
+               Kokkos::Impl::emu_sleep((unsigned long)val);
+           }
+        } else {
+           ValueInit::init( ptr->r, val );       			
+		}			         
      } else {
 		 //printf("[%d] identity cannot get reducer ptr \n", id);
 		 //fflush(stdout);
@@ -325,16 +344,20 @@ public:
      ReduceWrapper* ptr = get_reducer<ReduceWrapper>(rp, id);
      if (ptr)
      {
+		if (enable_atomic) {
         //printf("[%d] reducer view join (%lx): %d, %d \n", id, &val, val, right);
         //fflush(stdout);
-        while (true) {
-           if (Impl::lock_addr((unsigned long)&val)) {			   
-			   ValueJoin::join( ptr->r, &val, &right );
-               Impl::unlock_addr((unsigned long)&val);
-               break;
-            }
-            Kokkos::Impl::emu_sleep((unsigned long)&val);
-        }			                 
+           while (true) {
+              if (Impl::lock_addr((unsigned long)&val)) {			   
+			      ValueJoin::join( ptr->r, &val, &right );
+                  Impl::unlock_addr((unsigned long)&val);
+                  break;
+               }
+               Kokkos::Impl::emu_sleep((unsigned long)&val);
+           }
+	    } else {
+			ValueJoin::join( ptr->r, &val, &right );
+		}			                 
      }  
   }
 
@@ -407,9 +430,9 @@ class NodeletReducer : public cilk::reducer<Mon> {
     View myView;
 
 public:
-    NodeletReducer(const void * rp_, int id, const T * initVal): m_id(id), myElt(*initVal),myView(rp_, id, *initVal) {
+    NodeletReducer(const void * rp_, int id, const T * initVal, bool atomic_ = true): m_id(id), myElt(*initVal),myView(rp_, id, *initVal, atomic_) {
 	}
-    NodeletReducer(const void * rp_, int id, T initVal): m_id(id), myElt(initVal),myView(rp_, id, myElt) {
+    NodeletReducer(const void * rp_, int id, T initVal, bool atomic_ = true): m_id(id), myElt(initVal),myView(rp_, id, myElt, atomic_) {
 		//printf("NR: %d - %d \n", id, myElt);
 		//fflush(stdout);
     }

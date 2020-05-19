@@ -578,14 +578,19 @@ public:
 	      printf("default strided accessor block = %d \n", block_size); fflush(stdout);
 	  }
   accessor_strided( const size_t b_ ) : block_size(b_) {
-	    printf("strided accessor block = %d \n", block_size); fflush(stdout);
+	   printf("strided accessor block = %d \n", block_size); fflush(stdout);
+	//   printf("log2 of blocksize:  %d  ==> %d \n", block_size, log2(block_size));
+	//   fflush(stdout);
 	}
 
   constexpr typename offset_policy::pointer
     offset( pointer p , ptrdiff_t i ) const noexcept
     {  
 	   size_t ndx = i & (block_size-1);
-	   size_t off = (i>>log2(block_size));  
+	   //size_t off = (i>>log2(block_size));
+	   // note that the shift logic doesn't work here...blocksize is the number of elements residing on each node.
+	   // to get the offset (i.e. which node), we have to divide by block_size; 
+	   size_t off = i / block_size;  
 	   KOKKOS_EXPECTS( (off) < NODELETS() );
 	   if ( pRef[off] == nullptr ) {
 	      pRef[off] = (long *)mw_arrayindex((void*)p, off, NODELETS(),  block_size * size_of_type);
@@ -597,7 +602,10 @@ public:
   constexpr reference access( pointer p , ptrdiff_t i ) const noexcept
     {    
 	   size_t ndx = i & (block_size-1);
-	   size_t off = (i>>log2(block_size));
+	   //size_t off = (i>>log2(block_size));
+	   // note that the shift logic doesn't work here...blocksize is the number of elements residing on each node.
+	   // to get the offset (i.e. which node), we have to divide by block_size; 
+	   size_t off = i / block_size;
 	   if (off >= NODELETS())
 	      printf("Ref::strided pointer offset out of bounds: %d, %d, %d \n", i, off, block_size);  
 	   KOKKOS_EXPECTS( (off) < NODELETS() );   
